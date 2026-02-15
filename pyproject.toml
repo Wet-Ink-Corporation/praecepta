@@ -1,0 +1,208 @@
+[project]
+name = "praecepta"
+version = "0.1.0"
+description = "Composable Python framework for DDD/ES multi-tenant applications"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Wet Ink", email = "dev@wetink.ai" }
+]
+keywords = ["ddd", "event-sourcing", "multi-tenant", "framework"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "praecepta-foundation-domain",
+    "praecepta-foundation-application",
+    "praecepta-infra-fastapi",
+    "praecepta-infra-eventsourcing",
+    "praecepta-infra-auth",
+    "praecepta-infra-persistence",
+    "praecepta-infra-observability",
+    "praecepta-infra-taskiq",
+    "praecepta-domain-tenancy",
+    "praecepta-domain-identity",
+    "praecepta-integration-tenancy-identity",
+]
+
+# =============================================================================
+# uv Workspace
+# =============================================================================
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+praecepta-foundation-domain = { workspace = true }
+praecepta-foundation-application = { workspace = true }
+praecepta-infra-fastapi = { workspace = true }
+praecepta-infra-eventsourcing = { workspace = true }
+praecepta-infra-auth = { workspace = true }
+praecepta-infra-persistence = { workspace = true }
+praecepta-infra-observability = { workspace = true }
+praecepta-infra-taskiq = { workspace = true }
+praecepta-domain-tenancy = { workspace = true }
+praecepta-domain-identity = { workspace = true }
+praecepta-integration-tenancy-identity = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-xdist>=3.5",
+    "httpx>=0.27",
+    "mypy>=1.8",
+    "ruff>=0.1",
+    "import-linter>=2.0",
+]
+
+# =============================================================================
+# Ruff - Linting and Formatting
+# =============================================================================
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["packages/*/src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "RUF",    # ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["praecepta"]
+force-single-line = false
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# =============================================================================
+# Pytest - Testing Configuration
+# =============================================================================
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests", "packages/*/tests"]
+pythonpath = ["."]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: marks tests as integration tests (may require containers)",
+    "unit: marks tests as unit tests (no external dependencies)",
+    "slow: marks tests as slow (run separately from main suite)",
+]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--import-mode=importlib",
+    "-q",
+]
+
+# =============================================================================
+# Coverage - Test Coverage Configuration
+# =============================================================================
+
+[tool.coverage.run]
+source = ["packages/*/src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+    "@overload",
+    "raise NotImplementedError",
+]
+
+# =============================================================================
+# Mypy - Type Checking
+# =============================================================================
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "packages/foundation-domain/src:packages/foundation-application/src:packages/infra-fastapi/src:packages/infra-eventsourcing/src:packages/infra-auth/src:packages/infra-persistence/src:packages/infra-observability/src:packages/infra-taskiq/src:packages/domain-tenancy/src:packages/domain-identity/src:packages/integration-tenancy-identity/src"
+packages = ["praecepta"]
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+show_error_codes = true
+show_column_numbers = true
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+
+# =============================================================================
+# Import Linter - Architectural Boundary Enforcement
+# =============================================================================
+
+[tool.importlinter]
+root_packages = ["praecepta"]
+include_external_packages = true
+
+# Contract 1: Foundation packages have no infra dependencies
+[[tool.importlinter.contracts]]
+name = "Foundation layer is pure (no infrastructure deps)"
+type = "forbidden"
+source_modules = [
+    "praecepta.foundation.domain",
+    "praecepta.foundation.application",
+]
+forbidden_modules = [
+    "fastapi",
+    "sqlalchemy",
+    "httpx",
+    "structlog",
+    "opentelemetry",
+    "taskiq",
+    "redis",
+]
+
+# Contract 2: Layer ordering (foundation < infra < domain < integration)
+[[tool.importlinter.contracts]]
+name = "Package layers are respected"
+type = "layers"
+layers = [
+    "praecepta.integration",
+    "praecepta.domain",
+    "praecepta.infra",
+    "praecepta.foundation",
+]

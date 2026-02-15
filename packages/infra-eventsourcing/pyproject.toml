@@ -1,0 +1,31 @@
+[project]
+name = "praecepta-infra-eventsourcing"
+version = "0.1.0"
+description = "Event store factory, projections, and config for praecepta"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Wet Ink", email = "dev@wetink.ai" }
+]
+dependencies = [
+    "praecepta-foundation-domain",
+    "praecepta-foundation-application",
+    "eventsourcing[postgres]>=9.5",
+    "pydantic-settings>=2.0",
+    "psycopg[binary]>=3.1",
+    "cachetools>=5.3",
+]
+
+[tool.uv.sources]
+praecepta-foundation-domain = { workspace = true }
+praecepta-foundation-application = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.entry-points."praecepta.lifespan"]
+event_store = "praecepta.infra.eventsourcing:lifespan_contribution"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/praecepta"]

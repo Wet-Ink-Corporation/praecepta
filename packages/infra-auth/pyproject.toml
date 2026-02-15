@@ -1,0 +1,32 @@
+[project]
+name = "praecepta-infra-auth"
+version = "0.1.0"
+description = "Authentication adapters for praecepta — JWT, JWKS, PKCE, auth middleware"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Wet Ink", email = "dev@wetink.ai" }
+]
+dependencies = [
+    "praecepta-foundation-domain",
+    "praecepta-foundation-application",
+    "pyjwt[crypto]>=2.8",
+    "httpx>=0.28",
+    "bcrypt>=4.0",
+    "pydantic-settings>=2.0",
+]
+
+[tool.uv.sources]
+praecepta-foundation-domain = { workspace = true }
+praecepta-foundation-application = { workspace = true }
+
+[project.entry-points."praecepta.middleware"]
+api_key_auth = "praecepta.infra.auth.middleware.api_key_auth:contribution"
+jwt_auth = "praecepta.infra.auth.middleware.jwt_auth:contribution"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/praecepta"]

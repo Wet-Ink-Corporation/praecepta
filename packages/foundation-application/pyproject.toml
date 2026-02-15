@@ -1,0 +1,22 @@
+[project]
+name = "praecepta-foundation-application"
+version = "0.1.0"
+description = "Application layer patterns for DDD/ES multi-tenant applications"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Wet Ink", email = "dev@wetink.ai" }
+]
+dependencies = [
+    "praecepta-foundation-domain",
+]
+
+[tool.uv.sources]
+praecepta-foundation-domain = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/praecepta"]

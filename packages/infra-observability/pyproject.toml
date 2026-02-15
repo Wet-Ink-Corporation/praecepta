@@ -1,0 +1,32 @@
+[project]
+name = "praecepta-infra-observability"
+version = "0.1.0"
+description = "Logging and tracing for praecepta — structlog + OpenTelemetry"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Wet Ink", email = "dev@wetink.ai" }
+]
+dependencies = [
+    "praecepta-foundation-application",
+    "structlog>=24.0",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "pydantic-settings>=2.0",
+]
+
+[tool.uv.sources]
+praecepta-foundation-application = { workspace = true }
+
+[project.entry-points."praecepta.middleware"]
+trace_context = "praecepta.infra.observability.middleware:contribution"
+
+[project.entry-points."praecepta.lifespan"]
+observability = "praecepta.infra.observability:lifespan_contribution"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/praecepta"]

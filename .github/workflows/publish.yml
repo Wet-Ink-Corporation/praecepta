@@ -1,0 +1,68 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Gate: full quality suite must pass first ──────────────────────
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  # ── Build all workspace packages and create a GitHub Release ─────
+  publish:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build all workspace packages
+        run: |
+          packages=(
+            praecepta-foundation-domain
+            praecepta-foundation-application
+            praecepta-infra-fastapi
+            praecepta-infra-eventsourcing
+            praecepta-infra-auth
+            praecepta-infra-persistence
+            praecepta-infra-observability
+            praecepta-infra-taskiq
+            praecepta-domain-tenancy
+            praecepta-domain-identity
+            praecepta-integration-tenancy-identity
+          )
+          for pkg in "${packages[@]}"; do
+            echo "::group::Building $pkg"
+            uv build --package "$pkg" --out-dir dist/
+            echo "::endgroup::"
+          done
+
+      - name: Verify built artifacts
+        run: ls -lh dist/
+
+      - name: Verify installability
+        run: |
+          uv venv /tmp/verify-env
+          VIRTUAL_ENV=/tmp/verify-env uv pip install dist/*.whl
+          VIRTUAL_ENV=/tmp/verify-env uv pip list | grep praecepta
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
