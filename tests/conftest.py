@@ -13,9 +13,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 # Entry-point names excluded in integration tests (no external services).
-TEST_EXCLUDE_NAMES = frozenset(
-    {"api_key_auth", "jwt_auth", "event_store", "observability"}
-)
+TEST_EXCLUDE_NAMES = frozenset({"api_key_auth", "jwt_auth", "event_store", "observability"})
 
 
 @pytest.fixture()

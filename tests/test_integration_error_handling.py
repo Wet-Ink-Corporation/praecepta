@@ -32,9 +32,7 @@ class TestValidationError:
         dog_id = resp.json()["id"]
 
         client.post(f"/dogs/{dog_id}/tricks", json={"trick": "sit"}, headers=tenant_headers)
-        resp = client.post(
-            f"/dogs/{dog_id}/tricks", json={"trick": "sit"}, headers=tenant_headers
-        )
+        resp = client.post(f"/dogs/{dog_id}/tricks", json={"trick": "sit"}, headers=tenant_headers)
 
         assert resp.status_code == 422
         body = resp.json()
