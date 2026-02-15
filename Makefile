@@ -9,8 +9,9 @@ test-unit:      ## Run unit tests only
 test-int:       ## Run integration tests only
 	uv run pytest -m integration
 
-lint:           ## Run ruff linter with auto-fix
+lint:           ## Auto-fix lint issues and format code
 	uv run ruff check packages/ tests/ examples/ --fix
+	uv run ruff format packages/ tests/ examples/
 
 format:         ## Format code with ruff
 	uv run ruff format packages/ tests/ examples/
@@ -21,8 +22,9 @@ typecheck:      ## Run mypy strict type checking
 boundaries:     ## Check architecture import boundaries
 	uv run lint-imports
 
-verify:         ## Full verification (lint + typecheck + boundaries + test)
-	uv run ruff check packages/ tests/ examples/
+verify:         ## Full verification (lint + format + typecheck + boundaries + test)
+	uv run ruff check packages/ tests/ examples/ --fix
+	uv run ruff format packages/ tests/ examples/
 	uv run mypy
 	uv run lint-imports
 	uv run pytest
