@@ -523,6 +523,4 @@ projection.block_summary
 
 ## See Also
 
-- [Architecture Patterns](../04-solution-strategy/con-architecture-patterns.md) - Event Sourcing, CQRS
-- [Memory Context](../05-building-blocks/bounded-contexts/con-memory-context.md)
-- [Glossary: Event Sourcing](../12-glossary/ref-glossary.md#event-sourcing)
+<!-- All original links pointed to files that no longer exist in the migrated structure. -->

@@ -257,8 +257,8 @@ def test_dev_bypass_skipped_when_auth_header_present(test_client):
 
 - [JWT Authentication Middleware Pattern](ref-infra-jwt-auth-middleware.md) — Uses resolve_dev_bypass() for bypass decision
 - [JWKS Provider Pattern](ref-infra-jwks-provider.md) — Skipped when dev bypass is active
-- [PADR-106: Configuration Management](../../adr/patterns/PADR-106-configuration.md) — Environment variable patterns
-- [PADR-116: JWT Authentication with JWKS Discovery](../../adr/patterns/PADR-116-jwt-auth-jwks.md) — Dev bypass as part of auth strategy
+- [PADR-106: Configuration Management](../../decisions/patterns/PADR-106-configuration.md) — Environment variable patterns
+- [PADR-116: JWT Authentication with JWKS Discovery](../../decisions/patterns/PADR-116-jwt-auth-jwks.md) — Dev bypass as part of auth strategy
 
 ## See Also
 

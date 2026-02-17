@@ -36,6 +36,5 @@ context/api/
 | `references/con-error-handling.md` | Error architecture |
 | `references/ref-error-handling.md` | Error code reference |
 | `references/ref-app-factory.md` | App factory API, entry point groups, contribution types |
-| `references/ref-vite-proxy-oauth-callback.md` | Vite proxy OAuth callback routing |
 | `references/ref-request-context.md` | Request context architecture and usage |
 | `references/proc-add-contribution.md` | How to add routers, middleware, lifespan hooks |

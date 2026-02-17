@@ -63,6 +63,12 @@ dev = [
     "ruff>=0.1",
     "import-linter>=2.0",
 ]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-shadcn",
+    "mkdocstrings[python]>=0.27",
+    "mkdocs-llmstxt>=0.2",
+]
 
 # =============================================================================
 # Ruff - Linting and Formatting
@@ -128,11 +134,12 @@ addopts = [
 # =============================================================================
 
 [tool.coverage.run]
-source = ["packages/*/src"]
+source_pkgs = ["praecepta"]
 branch = true
 
 [tool.coverage.report]
 show_missing = true
+fail_under = 70
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

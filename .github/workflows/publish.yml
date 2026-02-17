@@ -33,20 +33,12 @@ jobs:
 
       - name: Build all workspace packages
         run: |
-          packages=(
-            praecepta-foundation-domain
-            praecepta-foundation-application
-            praecepta-infra-fastapi
-            praecepta-infra-eventsourcing
-            praecepta-infra-auth
-            praecepta-infra-persistence
-            praecepta-infra-observability
-            praecepta-infra-taskiq
-            praecepta-domain-tenancy
-            praecepta-domain-identity
-            praecepta-integration-tenancy-identity
-          )
-          for pkg in "${packages[@]}"; do
+          for dir in packages/*/; do
+            pkg=$(python -c "
+          import tomllib, pathlib
+          data = tomllib.loads(pathlib.Path('${dir}pyproject.toml').read_text())
+          print(data['project']['name'])
+          ")
             echo "::group::Building $pkg"
             uv build --package "$pkg" --out-dir dist/
             echo "::endgroup::"

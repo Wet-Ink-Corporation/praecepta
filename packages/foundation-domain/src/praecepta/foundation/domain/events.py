@@ -18,6 +18,37 @@ Example:
         # Event topic for routing:
         ResourceCreated.get_topic()
         # Returns: "myapp.domain.events:ResourceCreated"
+
+Event Schema Evolution Strategy:
+    Events are immutable once persisted. Schema changes must be handled
+    carefully to maintain replay compatibility.
+
+    **Backward-compatible changes** (safe without upcaster):
+    - Adding optional fields with defaults (e.g., ``category: str = ""``)
+    - The ``@event`` decorator stores all kwargs; missing fields in old
+      events are filled with defaults during replay
+
+    **Breaking changes** (require transcoder upcaster):
+    - Renaming fields
+    - Changing field types
+    - Removing fields
+    - Adding required fields without defaults
+
+    The eventsourcing library supports custom transcoders for upcasting
+    old event schemas. Register upcasters via the application's
+    ``env["TRANSCODER_TOPIC"]`` configuration. Example pattern::
+
+        # In transcoder registration:
+        def upcast_suspended_v1_to_v2(data: dict) -> dict:
+            if "category" not in data:
+                data["category"] = ""  # default for old events
+            return data
+
+    For aggregate events created by the ``@event`` decorator (e.g.,
+    ``Tenant.Suspended``), event classes are dynamically generated inner
+    classes. Their schema is defined by the kwargs of the decorated
+    method. Adding optional parameters with defaults to ``_apply_*``
+    methods is the safest evolution strategy.
 """
 
 from __future__ import annotations

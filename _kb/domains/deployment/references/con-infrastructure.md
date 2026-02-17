@@ -372,4 +372,4 @@ environment:
 
 - [Deployment Configs](ref-deployment-configs.md) - Docker/K8s configurations
 - [Deployment Procedure](proc-deployment-procedure.md) - Step-by-step guide
-- [Observability](../08-crosscutting/con-observability.md) - Monitoring setup
+- [Observability](../../observability/references/con-observability.md) - Monitoring setup

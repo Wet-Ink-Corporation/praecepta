@@ -4,7 +4,7 @@
 
 **Category:** API
 **Introduced:** F-101-004 (Tenant Monitoring)
-**Related ADRs:** [PADR-109](../../adr/patterns/PADR-109-sync-first-eventsourcing.md), [PADR-101](../../adr/patterns/PADR-101-vertical-slices.md)
+**Related ADRs:** [PADR-109](../../decisions/patterns/PADR-109-sync-first-eventsourcing.md), [PADR-101](../../decisions/patterns/PADR-101-vertical-slices.md)
 
 ---
 
@@ -503,10 +503,9 @@ async def test_health_endpoint_returns_warning_at_threshold(
 
 ## Related
 
-- **[PADR-101: Vertical Slices](../../adr/patterns/PADR-101-vertical-slices.md)** - Health endpoint as vertical slice
-- **[PADR-109: Sync-First Event Sourcing](../../adr/patterns/PADR-109-sync-first-eventsourcing.md)** - Async query endpoint pattern
+- **[PADR-101: Vertical Slices](../../decisions/patterns/PADR-101-vertical-slices.md)** - Health endpoint as vertical slice
+- **[PADR-109: Sync-First Event Sourcing](../../decisions/patterns/PADR-109-sync-first-eventsourcing.md)** - Async query endpoint pattern
 - **[ref-infra-delta-counter-projection.md](ref-infra-delta-counter-projection.md)** - Usage metrics projection (data source)
-- **[TenantConfigService](../../05-building-blocks/bounded-contexts/con-shared-context.md)** - Limit resolution
 
 ---
 

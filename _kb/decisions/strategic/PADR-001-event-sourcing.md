@@ -161,11 +161,8 @@ class BlockSummaryProjection:
 ## Related Decisions
 
 - PADR-002: Modular Monolith Architecture
-- [ADR-009: Three-Category Taxonomy](./ADR-009-three-category-taxonomy.md) (supersedes ADR-003)
 - PADR-004: Security Trimming Model
-- [ADR-013: Session Memory Contains No Cached Context](./ADR-013-session-no-cached-context.md) -- Session Memory is event-sourced; events represent session activity
-- [ADR-015: Entry-Level Abstractions](./ADR-015-entry-level-abstractions.md) (entry-based ownership model)
-- [ADR-115: Reinforcement Metrics as Projections](../patterns/ADR-115-reinforcement-metrics-projection.md) -- Reinforcement metrics derived from event stream (COUNT/MAX over reinforcement events)
+- Delta counter projections for reinforcement metrics — see [ref-infra-delta-counter-projection.md](../../domains/event-store-cqrs/references/ref-infra-delta-counter-projection.md)
 
 ## References
 
@@ -180,5 +177,5 @@ class BlockSummaryProjection:
 
 - Updated Order example to note legacy membership-based model; added forward-reference to ADR-015 (entry-based ownership)
 - Updated Related Decisions: ADR-003 reference replaced with ADR-009 (three-category taxonomy) and ADR-015 (entry-level abstractions)
-- Added cross-references to ADR-013 (session is event-sourced) and ADR-115 (reinforcement metrics derived from event stream)
+- Added cross-references to ADR-013 (session is event-sourced) and delta counter projection (reinforcement metrics derived from event stream)
 - Core decision unchanged; status remains Draft

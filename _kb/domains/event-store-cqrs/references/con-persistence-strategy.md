@@ -704,7 +704,7 @@ async def my_background_task(arg: str) -> str:
 await my_background_task.kiq("value")
 ```
 
-See [PADR-005: TaskIQ](../09-decisions/strategic/PADR-005-task-queue.md) for architecture decision.
+See [PADR-005: TaskIQ](../../decisions/strategic/PADR-005-task-queue.md) for architecture decision.
 
 ### Health Checks
 
@@ -721,7 +721,6 @@ async def check_redis_health() -> bool:
 ## See Also
 
 - [Domain Model](con-domain-model.md) - Aggregate and event design
-- [Architecture Patterns](../04-solution-strategy/con-architecture-patterns.md)
-- [PADR-001: Event Sourcing](../09-decisions/strategic/PADR-001-event-sourcing.md)
-- [PADR-005: TaskIQ](../09-decisions/strategic/PADR-005-task-queue.md) - Task queue decision
-- [Event Flow](../06-runtime/proc-event-flow.md)
+- [PADR-001: Event Sourcing](../../decisions/strategic/PADR-001-event-sourcing.md)
+- [PADR-005: TaskIQ](../../decisions/strategic/PADR-005-task-queue.md) - Task queue decision
+- [Event Flow](proc-event-flow.md)

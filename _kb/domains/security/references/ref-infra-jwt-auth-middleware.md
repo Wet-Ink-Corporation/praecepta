@@ -288,9 +288,9 @@ Do NOT use this pattern when:
 - [Dev Bypass Safety Pattern](ref-infra-dev-bypass-safety.md) — Production lockout for auth bypass
 - [Principal Value Object](ref-domain-principal.md) — Frozen dataclass for authenticated identity
 - [Request Context Pattern](con-request-context.md) — ContextVar propagation pattern
-- [PADR-109: Sync-First Event Sourcing](../../adr/patterns/PADR-109-sync-first-eventsourcing.md) — Middleware async strategy
-- [PADR-110: Application Lifecycle](../../adr/patterns/PADR-110-application-lifecycle.md) — Lifespan singleton pattern
-- [PADR-116: JWT Authentication with JWKS Discovery](../../adr/patterns/PADR-116-jwt-auth-jwks.md) — Architectural decision covering this implementation
+- [PADR-109: Sync-First Event Sourcing](../../decisions/patterns/PADR-109-sync-first-eventsourcing.md) — Middleware async strategy
+- [PADR-110: Application Lifecycle](../../decisions/patterns/PADR-110-application-lifecycle.md) — Lifespan singleton pattern
+- [PADR-116: JWT Authentication with JWKS Discovery](../../decisions/patterns/PADR-116-jwt-auth-jwks.md) — Architectural decision covering this implementation
 
 ## See Also
 

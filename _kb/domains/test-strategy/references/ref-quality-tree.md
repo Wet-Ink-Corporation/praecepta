@@ -258,6 +258,5 @@ This document presents {Project}'s quality attributes organized according to ISO
 
 ## See Also
 
-- [Quality Goals](../01-introduction/ref-quality-goals.md) - Priority ranking
 - [Quality Scenarios](ref-quality-scenarios.md) - Testable scenarios
 - [Quality Measures](con-quality-measures.md) - Measurement approach

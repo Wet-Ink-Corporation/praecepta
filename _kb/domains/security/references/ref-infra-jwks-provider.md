@@ -235,8 +235,8 @@ This handles key rotation gracefully:
 
 - [JWT Authentication Middleware Pattern](ref-infra-jwt-auth-middleware.md) — Uses JWKSProvider for signature verification
 - [Dev Bypass Safety Pattern](ref-infra-dev-bypass-safety.md) — Disables JWKSProvider in dev mode
-- [PADR-110: Application Lifecycle](../../adr/patterns/PADR-110-application-lifecycle.md) — Lifespan singleton pattern
-- [PADR-116: JWT Authentication with JWKS Discovery](../../adr/patterns/PADR-116-jwt-auth-jwks.md) — Technology choice for PyJWT + PyJWKClient
+- [PADR-110: Application Lifecycle](../../decisions/patterns/PADR-110-application-lifecycle.md) — Lifespan singleton pattern
+- [PADR-116: JWT Authentication with JWKS Discovery](../../decisions/patterns/PADR-116-jwt-auth-jwks.md) — Technology choice for PyJWT + PyJWKClient
 
 ## See Also
 

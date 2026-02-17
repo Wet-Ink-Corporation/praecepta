@@ -10,11 +10,22 @@ authors = [
 dependencies = [
     "praecepta-foundation-domain",
     "praecepta-foundation-application",
+    "praecepta-infra-eventsourcing",
+    "sqlalchemy>=2.0",
 ]
 
 [tool.uv.sources]
 praecepta-foundation-domain = { workspace = true }
 praecepta-foundation-application = { workspace = true }
+praecepta-infra-eventsourcing = { workspace = true }
+
+[project.entry-points."praecepta.applications"]
+identity_user = "praecepta.domain.identity.user_app:UserApplication"
+identity_agent = "praecepta.domain.identity.agent_app:AgentApplication"
+
+[project.entry-points."praecepta.projections"]
+user_profile = "praecepta.domain.identity.infrastructure.projections.user_profile:UserProfileProjection"
+agent_api_key = "praecepta.domain.identity.infrastructure.projections.agent_api_key:AgentAPIKeyProjection"
 
 [build-system]
 requires = ["hatchling"]

@@ -28,16 +28,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Lint (auto-fix)
-        run: uv run ruff check packages/ tests/ --fix
+      - name: Lint
+        run: uv run ruff check packages/ tests/ examples/
 
-      - name: Format (auto-fix)
-        run: uv run ruff format packages/ tests/
-
-      - name: Check for unfixable changes
-        run: |
-          uv run ruff check packages/ tests/
-          uv run ruff format --check packages/ tests/
+      - name: Format check
+        run: uv run ruff format --check packages/ tests/ examples/
 
       - name: Type check
         run: uv run mypy
@@ -46,4 +41,4 @@ jobs:
         run: uv run lint-imports
 
       - name: Test
-        run: uv run pytest --tb=short
+        run: uv run pytest --tb=short --cov --cov-report=term-missing

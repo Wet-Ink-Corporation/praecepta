@@ -1,0 +1,110 @@
+site_name: Praecepta
+site_url: https://praecepta.dev
+site_description: Composable Python framework for DDD/ES multi-tenant applications
+repo_url: https://github.com/wetink/praecepta
+repo_name: wetink/praecepta
+
+theme:
+  name: shadcn
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Core Concepts: getting-started/concepts.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Packages: architecture/packages.md
+    - Entry-Point Discovery: architecture/entry-points.md
+    - Namespace Packages: architecture/namespace-packages.md
+  - Guides:
+    - Create a Domain Package: guides/create-domain-package.md
+    - Define an Aggregate: guides/define-aggregate.md
+    - Define Events: guides/define-events.md
+    - Build a Projection: guides/build-projection.md
+    - Add an API Endpoint: guides/add-api-endpoint.md
+    - Multi-Tenancy: guides/multi-tenancy.md
+    - Testing: guides/testing.md
+  - API Reference:
+    - Foundation Domain: reference/foundation-domain.md
+    - Foundation Application: reference/foundation-application.md
+    - Infra FastAPI: reference/infra-fastapi.md
+    - Infra Event Sourcing: reference/infra-eventsourcing.md
+    - Infra Auth: reference/infra-auth.md
+    - Infra Persistence: reference/infra-persistence.md
+    - Infra Observability: reference/infra-observability.md
+    - Domain Tenancy: reference/domain-tenancy.md
+    - Domain Identity: reference/domain-identity.md
+  - Decisions: decisions.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - packages/foundation-domain/src
+            - packages/foundation-application/src
+            - packages/infra-fastapi/src
+            - packages/infra-eventsourcing/src
+            - packages/infra-auth/src
+            - packages/infra-persistence/src
+            - packages/infra-observability/src
+            - packages/domain-tenancy/src
+            - packages/domain-identity/src
+          options:
+            show_source: false
+            show_root_heading: true
+            members_order: source
+  - llmstxt:
+      markdown_description: >
+        Composable Python framework for building Domain-Driven Design /
+        Event Sourcing multi-tenant applications in Python 3.12+.
+        Provides a 4-layer package architecture (Foundation, Infrastructure,
+        Domain, Integration), entry-point auto-discovery, and conventions
+        for aggregates, projections, and multi-tenant isolation.
+      full_output: llms-full.txt
+      sections:
+        Getting Started:
+          - getting-started/installation.md
+          - getting-started/quickstart.md
+          - getting-started/concepts.md
+        Architecture:
+          - architecture/overview.md
+          - architecture/packages.md
+          - architecture/entry-points.md
+          - architecture/namespace-packages.md
+        Guides:
+          - guides/create-domain-package.md
+          - guides/define-aggregate.md
+          - guides/define-events.md
+          - guides/build-projection.md
+          - guides/add-api-endpoint.md
+          - guides/multi-tenancy.md
+          - guides/testing.md
+        API Reference:
+          - reference/foundation-domain.md
+          - reference/foundation-application.md
+          - reference/infra-fastapi.md
+          - reference/infra-eventsourcing.md
+          - reference/infra-auth.md
+          - reference/infra-persistence.md
+          - reference/infra-observability.md
+          - reference/domain-tenancy.md
+          - reference/domain-identity.md
+        Decisions:
+          - decisions.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - toc:
+      permalink: true
+  - tables

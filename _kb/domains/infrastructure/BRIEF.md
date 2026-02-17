@@ -4,7 +4,7 @@ PostgreSQL, Redis, Neo4j, Docker, and configuration management.
 
 ## Mental Model
 
-Three datastores: PostgreSQL (event store + projections), Neo4j (graph database), Redis (task queue + cache). All managed via Docker Compose for development. Configuration via environment variables with type-safe Pydantic Settings (PPADR-106).
+Three datastores: PostgreSQL (event store + projections), Neo4j (graph database), Redis (task queue + cache). All managed via Docker Compose for development. Configuration via environment variables with type-safe Pydantic Settings (PADR-106).
 
 ## Key Patterns
 

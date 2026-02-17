@@ -140,7 +140,7 @@ result = tag_registry.validate_tag(tag)
 - **Story:** S-100-002-002 (namespace categories registry)
 - **Key Files:**
   - `src/{Project}/ordering/domain/tag_registry.py` (reference implementation)
-- **Pattern Doc:** [ref-domain-module-level-registry.md](../../architecture-bible/08-crosscutting/ref-domain-module-level-registry.md)
+- **Pattern Doc:** [ref-domain-module-level-registry.md](../../domains/event-store-cqrs/references/ref-domain-module-level-registry.md)
 
 **Convention applies to:**
 
@@ -220,7 +220,7 @@ class TagRegistryConfig(BaseSettings):
 
 - [PADR-108: Domain Service Protocols](PADR-108-domain-service-protocols.md) — Pure function protocols
 - [PADR-113: Two-Tier Validation Pattern](PADR-113-two-tier-validation.md) — Uses validate_tag() from registry
-- [ref-domain-module-level-registry.md](../../architecture-bible/08-crosscutting/ref-domain-module-level-registry.md) — Detailed pattern reference
+- [ref-domain-module-level-registry.md](../../domains/event-store-cqrs/references/ref-domain-module-level-registry.md) — Detailed pattern reference
 
 ---
 
@@ -228,5 +228,5 @@ class TagRegistryConfig(BaseSettings):
 
 - [ ] Human review approved
 - [ ] Status changed from "Proposed" to "Accepted"
-- [ ] Convention documented in architecture-bible
+- [ ] Convention documented in KB references
 - [ ] Future registries follow this pattern

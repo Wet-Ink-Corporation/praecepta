@@ -264,7 +264,7 @@ sequenceDiagram
 **Trigger:** Memory block lifecycle events from Memory context
 **Outcome:** Real-time per-tenant resource usage counters maintained in shared context
 
-**Pattern:** Delta-based counter projection (see [ref-infra-delta-counter-projection.md](../../08-crosscutting/ref-infra-delta-counter-projection.md))
+**Pattern:** Delta-based counter projection (see [ref-infra-delta-counter-projection.md](../../event-store-cqrs/references/ref-infra-delta-counter-projection.md))
 
 **Events consumed from Memory context:**
 
@@ -302,7 +302,7 @@ sequenceDiagram
 **Trigger:** Operator queries tenant health endpoint
 **Outcome:** Composite health status with per-resource usage percentages and status indicators
 
-**Pattern:** Composite health scoring (see [ref-api-composite-health-scoring.md](../../08-crosscutting/ref-api-composite-health-scoring.md))
+**Pattern:** Composite health scoring (see [ref-api-composite-health-scoring.md](../../observability/references/ref-api-composite-health-scoring.md))
 
 **Data flow:**
 

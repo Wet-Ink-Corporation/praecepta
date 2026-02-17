@@ -1,0 +1,83 @@
+"""Projection for materializing Agent API key events.
+
+Subscribes to Agent.APIKeyIssued and Agent.APIKeyRotated events.
+Maintains the agent_api_key_registry projection table via UPSERT pattern.
+"""
+
+from __future__ import annotations
+
+from functools import singledispatchmethod
+from typing import TYPE_CHECKING, ClassVar
+
+from praecepta.infra.eventsourcing.projections.base import BaseProjection
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from eventsourcing.application import ProcessingEvent
+    from eventsourcing.domain import DomainEvent
+
+    from praecepta.domain.identity.infrastructure.agent_api_key_repository import (
+        AgentAPIKeyRepository,
+    )
+
+
+class AgentAPIKeyProjection(BaseProjection):
+    """Materializes Agent API key events into agent_api_key_registry projection table.
+
+    Topics: Subscribes to Agent.APIKeyIssued and Agent.APIKeyRotated events.
+    Pattern: UPSERT into agent_api_key_registry (idempotent for replay).
+    """
+
+    topics: ClassVar[tuple[str, ...]] = (  # type: ignore[misc]
+        "praecepta.domain.identity.agent:Agent.APIKeyIssued",
+        "praecepta.domain.identity.agent:Agent.APIKeyRotated",
+    )
+
+    def __init__(self, repository: AgentAPIKeyRepository) -> None:
+        super().__init__()
+        self._repo = repository
+
+    @singledispatchmethod
+    def policy(
+        self,
+        domain_event: DomainEvent,
+        processing_event: ProcessingEvent[UUID],
+    ) -> None:
+        """Route events by class name."""
+        event_name = domain_event.__class__.__name__
+        if event_name == "APIKeyIssued":
+            self._handle_issued(domain_event)
+        elif event_name == "APIKeyRotated":
+            self._handle_rotated(domain_event)
+
+    def _handle_issued(self, event: DomainEvent) -> None:
+        """UPSERT API key on issuance."""
+        self._repo.upsert(
+            key_id=event.key_id,  # type: ignore[attr-defined]
+            agent_id=event.originator_id,
+            tenant_id=event.tenant_id,  # type: ignore[attr-defined]
+            key_hash=event.key_hash,  # type: ignore[attr-defined]
+            status="active",
+        )
+
+    def _handle_rotated(self, event: DomainEvent) -> None:
+        """Atomically revoke old key and insert new key on rotation."""
+        # Revoke old key
+        self._repo.update_status(
+            key_id=event.revoked_key_id,  # type: ignore[attr-defined]
+            status="revoked",
+        )
+
+        # Insert new key
+        self._repo.upsert(
+            key_id=event.new_key_id,  # type: ignore[attr-defined]
+            agent_id=event.originator_id,
+            tenant_id=event.tenant_id,  # type: ignore[attr-defined]
+            key_hash=event.new_key_hash,  # type: ignore[attr-defined]
+            status="active",
+        )
+
+    def clear_read_model(self) -> None:
+        """TRUNCATE agent_api_key_registry for rebuild."""
+        self._repo.truncate()

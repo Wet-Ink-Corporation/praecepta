@@ -14,9 +14,6 @@ build/
 venv/
 ENV/
 
-# uv
-uv.lock
-
 # Testing / Coverage
 .pytest_cache/
 .hypothesis/
@@ -45,6 +42,9 @@ coverage.xml
 .DS_Store
 Thumbs.db
 nul
+
+# Docs (MkDocs)
+docs/site/
 
 # Environment
 .env

@@ -692,4 +692,3 @@ class ErrorTracker:
 
 - [Observability](con-observability.md) - Error logging and tracing
 - [Testing Strategy](con-testing-strategy.md) - Testing error paths
-- [Quality Approach](../04-solution-strategy/con-quality-approach.md)

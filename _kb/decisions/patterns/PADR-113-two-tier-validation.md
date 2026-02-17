@@ -161,7 +161,7 @@ def validate_tag(tag: Tag) -> ValidationResult:
 - **Key Files:**
   - `src/{Project}/ordering/domain/value_objects.py` (Tag.**init** with format validation)
   - `src/{Project}/ordering/domain/tag_registry.py` (validate_tag with semantic validation)
-- **Pattern Doc:** [ref-domain-two-tier-validation.md](../../architecture-bible/08-crosscutting/ref-domain-two-tier-validation.md)
+- **Pattern Doc:** [ref-domain-two-tier-validation.md](../../domains/ddd-patterns/references/ref-domain-two-tier-validation.md)
 
 **Pattern applies to:**
 
@@ -310,8 +310,8 @@ if ctx.errors:
 ## Related
 
 - [PADR-112: Module-Level Registry Pattern](PADR-112-module-level-registry.md) — Registry provides validate_tag() function
-- [ref-domain-two-tier-validation.md](../../architecture-bible/08-crosscutting/ref-domain-two-tier-validation.md) — Detailed pattern reference
-- [ref-domain-module-level-registry.md](../../architecture-bible/08-crosscutting/ref-domain-module-level-registry.md) — Module-level validation functions
+- [ref-domain-two-tier-validation.md](../../domains/ddd-patterns/references/ref-domain-two-tier-validation.md) — Detailed pattern reference
+- [ref-domain-module-level-registry.md](../../domains/event-store-cqrs/references/ref-domain-module-level-registry.md) — Module-level validation functions
 
 ---
 
@@ -319,5 +319,5 @@ if ctx.errors:
 
 - [ ] Human review approved
 - [ ] Status changed from "Proposed" to "Accepted"
-- [ ] Pattern documented in architecture-bible
+- [ ] Pattern documented in KB references
 - [ ] Future value objects with controlled vocabularies follow this pattern

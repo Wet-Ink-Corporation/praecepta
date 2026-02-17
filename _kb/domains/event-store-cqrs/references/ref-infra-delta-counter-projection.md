@@ -4,7 +4,7 @@
 
 **Category:** Infrastructure
 **Introduced:** F-101-004 (Tenant Monitoring)
-**Related ADRs:** [PADR-115](../../adr/patterns/PADR-115-reinforcement-metrics-projection.md), [PADR-109](../../adr/patterns/PADR-109-sync-first-eventsourcing.md)
+**Related ADRs:** [PADR-115](../../decisions/patterns/PADR-115-postgresql-rls-tenant-isolation.md), [PADR-109](../../decisions/patterns/PADR-109-sync-first-eventsourcing.md)
 
 ---
 
@@ -329,11 +329,9 @@ def test_projection_handles_lifecycle_events(
 
 ## Related
 
-- **[PADR-115: Reinforcement Metrics Projection](../../adr/patterns/PADR-115-reinforcement-metrics-projection.md)** - Established projection-as-read-model pattern
-- **[PADR-109: Sync-First Event Sourcing](../../adr/patterns/PADR-109-sync-first-eventsourcing.md)** - Projection repository sync pattern
-- **[PADR-115: PostgreSQL RLS Tenant Isolation](../../adr/patterns/PADR-115-postgresql-rls-tenant-isolation.md)** - RLS enforcement on projection tables
+- **[PADR-109: Sync-First Event Sourcing](../../decisions/patterns/PADR-109-sync-first-eventsourcing.md)** - Projection repository sync pattern
+- **[PADR-115: PostgreSQL RLS Tenant Isolation](../../decisions/patterns/PADR-115-postgresql-rls-tenant-isolation.md)** - RLS enforcement on projection tables
 - **[ref-infra-rls-migration-helpers.md](ref-infra-rls-migration-helpers.md)** - Alembic helpers for RLS setup
-- **[BaseProjection](../../05-building-blocks/building-blocks/ref-cqrs-projection.md)** - Base class for all projections
 
 ---
 

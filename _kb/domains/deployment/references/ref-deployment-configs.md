@@ -538,4 +538,4 @@ async def liveness_check():
 
 - [Infrastructure](con-infrastructure.md) - Service topology
 - [Deployment Procedure](proc-deployment-procedure.md) - Step-by-step guide
-- [Observability](../08-crosscutting/con-observability.md) - Monitoring configuration
+- [Observability](../../observability/references/con-observability.md) - Monitoring configuration

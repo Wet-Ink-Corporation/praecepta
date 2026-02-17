@@ -613,7 +613,5 @@ async def delete_block(block_id: UUID, user: AuthenticatedUser):
 
 ## See Also
 
-- [Security Context](../05-building-blocks/bounded-contexts/con-security-context.md)
-- [Query Flow](../06-runtime/proc-query-flow.md) - Security trimming in action
-- [External Systems](../03-context/ref-external-systems.md) - Identity providers
-- [PADR-004: Security Trimming](../09-decisions/strategic/PADR-004-security-trimming.md)
+- [Security Context](con-security-context.md)
+- [PADR-004: Security Trimming](../../decisions/strategic/PADR-004-security-trimming.md)

@@ -648,6 +648,6 @@ groups:
 
 ## See Also
 
-- [Deployment Procedure](../07-deployment/proc-deployment-procedure.md) - Monitoring setup
+- [Deployment Procedure](../../deployment/references/proc-deployment-procedure.md) - Monitoring setup
 - [Error Handling](con-error-handling.md) - Error logging patterns
-- [Infrastructure](../07-deployment/con-infrastructure.md) - Observability stack
+- [Infrastructure](../../deployment/references/con-infrastructure.md) - Observability stack

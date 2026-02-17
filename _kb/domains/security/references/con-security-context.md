@@ -452,8 +452,5 @@ src/{project}/security/
 
 ## See Also
 
-- [Level 1 Overview](../con-level1-overview.md)
 - [Query Context](con-query-context.md) - Consumes security trimming
 - [Ingestion Context](con-ingestion-context.md) - Syncs source ACLs
-- [Glossary: Security Trimming](../../12-glossary/ref-glossary.md#security-trimming)
-- [Glossary: Principal](../../12-glossary/ref-glossary.md#principal)

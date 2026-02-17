@@ -396,4 +396,4 @@ Recommendations:
 
 - [Quality Tree](ref-quality-tree.md) - Quality attribute hierarchy
 - [Quality Scenarios](ref-quality-scenarios.md) - Testable scenarios
-- [Observability](../08-crosscutting/con-observability.md) - Monitoring infrastructure
+- [Observability](../../observability/references/con-observability.md) - Monitoring infrastructure

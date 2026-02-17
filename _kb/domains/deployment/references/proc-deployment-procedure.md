@@ -373,4 +373,4 @@ az monitor app-insights query \
 
 - [Infrastructure](con-infrastructure.md) - Service topology
 - [Deployment Configs](ref-deployment-configs.md) - Configuration files
-- [Observability](../08-crosscutting/con-observability.md) - Monitoring setup
+- [Observability](../../observability/references/con-observability.md) - Monitoring setup

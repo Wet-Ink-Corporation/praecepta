@@ -70,10 +70,10 @@ All event-sourced aggregates with 3 or more lifecycle states MUST follow the **A
 - **Key files:**
   - `src/{Project}/shared/domain/tenant.py` — Tenant aggregate (4-state)
   - `src/{Project}/ordering/domain/aggregates.py` — Order aggregate (3-state)
-- **Pattern:** [ref-domain-aggregate-lifecycle.md](../../architecture-bible/08-crosscutting/ref-domain-aggregate-lifecycle.md)
+- **Pattern:** [ref-domain-aggregate-lifecycle.md](../../domains/ddd-patterns/references/ref-domain-aggregate-lifecycle.md)
 
 ## Related
 
 - [PADR-001: Event Sourcing](../strategic/PADR-001-event-sourcing.md) — Core event sourcing pattern
 - [PADR-109: Sync-First Event Sourcing](PADR-109-sync-first-eventsourcing.md) — Async strategy for commands
-- [con-domain-model.md](../../architecture-bible/08-crosscutting/con-domain-model.md) — Aggregate design principles
+- [con-domain-model.md](../../domains/ddd-patterns/references/con-domain-model.md) — Aggregate design principles

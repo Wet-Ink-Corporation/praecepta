@@ -29,10 +29,10 @@ Two layers: **AuthN** via external OIDC provider (JWT + JWKS, PADR-116/122) and 
 
 | Reference | Load When |
 |-----------|-----------|
-| `_kb/reference/architecture-bible/con-security-context.md` | Designing security features |
+| `references/con-security-context.md` | Designing security features |
 | `references/con-security-model.md` | Security architecture overview |
 | `_kb/decisions/strategic/PADR-004-security-trimming.md` | Query-time filtering rationale |
 | `_kb/decisions/patterns/PADR-115-postgresql-rls-tenant-isolation.md` | RLS implementation |
 | `_kb/decisions/patterns/PADR-116-jwt-auth-jwks.md` | JWT validation patterns |
 | `references/security-access-control.md` | ACL model design |
-| `references/ref-frontend-token-storage-hybrid.md` | Frontend token storage pattern (React SPA) |
+

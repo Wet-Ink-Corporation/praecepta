@@ -10,7 +10,7 @@ Structured logging with correlation IDs. OpenTelemetry-compatible tracing. Healt
 
 - **Logging:** Structured JSON, `structlog` with context binding
 - **Tracing:** Span creation per request, propagated through context
-- **Metrics:** Delta counter projections for aggregate metrics (PADR-115)
+- **Metrics:** Delta counter projections for aggregate metrics
 - **Health:** Liveness + readiness endpoints checking DB, Neo4j, Redis
 
 ## Reference Index
@@ -18,6 +18,5 @@ Structured logging with correlation IDs. OpenTelemetry-compatible tracing. Healt
 | Reference | Load When |
 |-----------|-----------|
 | `_kb/decisions/patterns/PADR-105-observability.md` | Observability patterns |
-| `_kb/decisions/patterns/PADR-115-reinforcement-metrics-projection.md` | Metrics projection |
 | `references/con-observability.md` | Observability overview |
 | `references/ref-infra-delta-counter-projection.md` | Delta counter pattern |

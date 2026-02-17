@@ -92,7 +92,7 @@ Both use the same `postgresql+psycopg://` URL format. SQLAlchemy's psycopg3 dial
 - [PADR-102: Hexagonal Ports](./PADR-102-hexagonal-ports.md) - Repository abstraction
 - [PADR-107: API Documentation](./PADR-107-api-documentation.md) - Endpoint patterns
 - [PADR-110: Application Lifecycle](./PADR-110-application-lifecycle.md) - CoreApplication singleton
-- [ADR-115: Reinforcement Metrics as Projections](./ADR-115-reinforcement-metrics-projection.md) -- Reinforcement metrics projection workers use the sync-first pattern for event processing
+- Delta counter projections use the sync-first pattern for event processing — see [ref-infra-delta-counter-projection.md](../../domains/event-store-cqrs/references/ref-infra-delta-counter-projection.md)
 
 ## References
 
@@ -106,5 +106,5 @@ Both use the same `postgresql+psycopg://` URL format. SQLAlchemy's psycopg3 dial
 
 ### 2026-02-05: Cross-Reference Addition (F-100-004)
 
-- Added cross-reference to ADR-115 (reinforcement metrics projection workers use sync-first pattern)
+- Added cross-reference to delta counter projection (reinforcement metrics projection workers use sync-first pattern)
 - Core decision unchanged; status remains Accepted

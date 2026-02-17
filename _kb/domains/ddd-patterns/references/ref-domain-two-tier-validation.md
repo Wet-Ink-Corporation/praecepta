@@ -408,7 +408,7 @@ class TestTagSemanticValidation:
 
 ## Related Decisions
 
-- [PADR-113: Two-Tier Validation Pattern](../09-decisions/patterns/PADR-113-two-tier-validation.md) — Formalization of this pattern as a convention
+- [PADR-113: Two-Tier Validation Pattern](../../decisions/patterns/PADR-113-two-tier-validation.md) — Formalization of this pattern as a convention
 
 ---
 

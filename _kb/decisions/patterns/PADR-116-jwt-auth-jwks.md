@@ -265,10 +265,10 @@ Future enhancements (not in scope for F-102-001):
 
 ## Related
 
-- [ref-infra-jwt-auth-middleware.md](../../architecture-bible/08-crosscutting/ref-infra-jwt-auth-middleware.md) — JWT middleware pattern
-- [ref-infra-jwks-provider.md](../../architecture-bible/08-crosscutting/ref-infra-jwks-provider.md) — JWKS provider pattern
-- [ref-infra-dev-bypass-safety.md](../../architecture-bible/08-crosscutting/ref-infra-dev-bypass-safety.md) — Dev bypass safety pattern
-- [ref-domain-principal.md](../../architecture-bible/08-crosscutting/ref-domain-principal.md) — Principal value object
+- [ref-infra-jwt-auth-middleware.md](../../domains/security/references/ref-infra-jwt-auth-middleware.md) — JWT middleware pattern
+- [ref-infra-jwks-provider.md](../../domains/security/references/ref-infra-jwks-provider.md) — JWKS provider pattern
+- [ref-infra-dev-bypass-safety.md](../../domains/security/references/ref-infra-dev-bypass-safety.md) — Dev bypass safety pattern
+- [ref-domain-principal.md](../../domains/security/references/ref-domain-principal.md) — Principal value object
 - [PADR-109: Sync-First Event Sourcing](PADR-109-sync-first-eventsourcing.md) — Middleware async strategy
 - [PADR-110: Application Lifecycle](PADR-110-application-lifecycle.md) — Lifespan singleton pattern
 - [PADR-103: Error Handling Strategy](PADR-103-error-handling.md) — RFC 7807 pattern, AuthenticationError/AuthorizationError hierarchy

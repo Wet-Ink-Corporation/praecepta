@@ -40,6 +40,7 @@ from praecepta.foundation.domain.policy_types import PolicyType
 from praecepta.foundation.domain.ports import APIKeyGeneratorPort, LLMServicePort
 from praecepta.foundation.domain.principal import Principal, PrincipalType
 from praecepta.foundation.domain.tenant_value_objects import (
+    SuspensionCategory,
     TenantName,
     TenantSlug,
     TenantStatus,
@@ -82,6 +83,7 @@ __all__ = [
     "PrincipalType",
     "ResourceLimitExceededError",
     "StringConfigValue",
+    "SuspensionCategory",
     "TenantId",
     "TenantName",
     "TenantSlug",

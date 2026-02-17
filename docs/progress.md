@@ -327,6 +327,112 @@ lint-imports          → 2 contracts kept, 0 broken (118 files, 376 deps)
 
 ---
 
-## Phase 2–5: Not yet started
+## Phase 2: Back-port Mnemonic to Praecepta Imports ✅
+
+**Status:** Complete (tracked in mnemonic repo)
+
+All mnemonic imports were updated from `mnemonic.shared.*` to `praecepta.foundation.*` and `praecepta.infra.*`. Mnemonic now depends on praecepta as its framework layer.
+
+> **Checkpoint 2 reached:** Mnemonic imports from praecepta. Ready for domain extraction.
+
+---
+
+## Phase 3: Extract Domain Packages ✅
+
+**Status:** Complete
+**Date:** 2026-02-15
+
+Extracted the two domain bounded contexts (`domain-tenancy`, `domain-identity`) from mnemonic into praecepta as reusable packages. Includes aggregates, application services, and full infrastructure implementations (projections, repositories, registries, provisioning service, cascade deletion).
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Tenant config coupling | **Generic aggregate** — removed `ConfigKey`/`CONFIG_KEY_TYPES` validation | Config validation is application-level, not a domain invariant. Eventsourcing library reconstitution constraints prevent subclassing or injecting validators. Aggregate stores any `str` key / `dict` value. |
+| Integration package | **Deferred** — left `integration-tenancy-identity` as a stub | No actual cross-domain sagas exist yet in mnemonic |
+| Infrastructure scope | **Full extraction** — aggregates, app services, projections, repos, registries, provisioning, cascade deletion | Complete bounded contexts ready for consumer wiring |
+
+### Step 1 — `domain-tenancy` Domain & Application Layer ✅
+
+| File | Contents |
+|------|----------|
+| `tenant.py` | Tenant aggregate — full state machine (PROVISIONING → ACTIVE ↔ SUSPENDED → DECOMMISSIONED), 7 event types, generic config updates (any string key, any dict value) |
+| `tenant_app.py` | `TenantApplication(Application[UUID])` with `snapshotting_intervals = {Tenant: 50}` |
+| `__init__.py` | Re-exports `Tenant`, `TenantApplication` |
+| `pyproject.toml` | Dependencies: foundation-domain, foundation-application, infra-eventsourcing, sqlalchemy. Entry points for applications + projections |
+
+### Step 2 — `domain-tenancy` Infrastructure Layer ✅
+
+| File | Contents |
+|------|----------|
+| `infrastructure/config_repository.py` | `ConfigRepository` implementing the `ConfigRepository` protocol from foundation-application |
+| `infrastructure/slug_registry.py` | `SlugRegistry` — reservation pattern (reserve/confirm/release) with UniqueViolation handling |
+| `infrastructure/cascade_deletion.py` | `CascadeDeletionService` + `CascadeDeletionResult` — pure Python, no framework deps |
+| `infrastructure/projections/tenant_config.py` | `TenantConfigProjection` — subscribes to `Tenant.ConfigUpdated`, uses `ConfigCache` protocol (public methods, not private attrs) |
+
+### Step 3 — `domain-tenancy` Tests ✅
+
+| Test File | Coverage |
+|-----------|----------|
+| `test_tenant.py` | Full state machine: creation, activation, suspension, reactivation, decommission, generic config updates, full lifecycle, DataDeleted audit, invalid transitions, idempotency |
+| `test_tenant_app.py` | Instantiation, snapshotting config, save + retrieve round-trip, multi-event reconstitution |
+| `test_config_repository.py` | Mock session_factory, get/upsert/delete, ensure_table_exists |
+| `test_slug_registry.py` | Reserve/confirm/release SQL, UniqueViolation → ConflictError, table creation |
+| `test_tenant_config_projection.py` | Topic subscription, upsert on ConfigUpdated, cache invalidation, unknown event handling |
+| `test_cascade_deletion.py` | Registration, execution, result tracking |
+
+### Step 4 — `domain-identity` Domain & Application Layer ✅
+
+| File | Contents |
+|------|----------|
+| `user.py` | User aggregate — OIDC claims mapping, display_name fallback chain (name → email prefix → "User"), profile updates, preferences |
+| `agent.py` | Agent aggregate — registration, ACTIVE ↔ SUSPENDED state machine, API key issuance + rotation with hash storage |
+| `user_app.py` | `UserApplication(Application[UUID])` with `snapshotting_intervals = {User: 50}` |
+| `agent_app.py` | `AgentApplication(Application[UUID])` with `snapshotting_intervals = {Agent: 50}` |
+| `__init__.py` | Re-exports `User`, `Agent`, `UserApplication`, `AgentApplication` |
+| `pyproject.toml` | Dependencies + entry points for 2 applications + 2 projections |
+
+### Step 5 — `domain-identity` Infrastructure Layer ✅
+
+| File | Contents |
+|------|----------|
+| `infrastructure/user_profile_repository.py` | `UserProfileRepository` + `UserProfileRow` DTO — sync writes, async reads, RLS-enabled table creation |
+| `infrastructure/agent_api_key_repository.py` | `AgentAPIKeyRepository` + `AgentAPIKeyRow` DTO |
+| `infrastructure/oidc_sub_registry.py` | `OidcSubRegistry` — reservation pattern for OIDC sub uniqueness enforcement |
+| `infrastructure/user_provisioning.py` | `UserProvisioningService` — idempotent JIT user creation with fast-path (lookup), slow-path (reserve → create → confirm), race condition retry, compensating action (release on failure) |
+| `infrastructure/projections/user_profile.py` | `UserProfileProjection` — subscribes to User.Provisioned, ProfileUpdated, PreferencesUpdated |
+| `infrastructure/projections/agent_api_key.py` | `AgentAPIKeyProjection` — subscribes to Agent.APIKeyIssued, APIKeyRotated |
+
+Topic strings updated from `mnemonic.shared.domain.*` to `praecepta.domain.identity.*`.
+
+### Step 6 — `domain-identity` Tests ✅
+
+| Test File | Coverage |
+|-----------|----------|
+| `test_user.py` | Creation with OIDC claims, display_name fallback chain (name → email prefix → "User"), profile updates, preferences updates |
+| `test_agent.py` | Registration, suspend/reactivate state machine, API key issuance, API key rotation, invalid transitions |
+| `test_user_app.py` | Instantiation, snapshotting, save + retrieve round-trip |
+| `test_agent_app.py` | Instantiation, snapshotting, save + retrieve round-trip |
+| `test_user_profile_projection.py` | Topic subscription, upsert on Provisioned, display_name fallback, ProfileUpdated, PreferencesUpdated, unknown events |
+| `test_agent_api_key_projection.py` | Topic subscription, upsert on APIKeyIssued, revoke + upsert on APIKeyRotated, unknown events |
+| `test_user_provisioning.py` | Fast-path (existing user), cross-tenant conflict, slow-path (new user creation), compensating action on save failure, race condition retry |
+| `test_oidc_sub_registry.py` | Reserve/confirm/release SQL, lookup (found/not found), table creation |
+
+### Verification Results
+
+```text
+uv sync --dev         → All workspace packages installed (domain packages rebuilt)
+ruff check --fix      → 2 auto-fixed, 0 remaining
+ruff format           → 8 files reformatted
+mypy                  → No issues found (17 source files, strict mode)
+lint-imports          → 2 contracts kept, 0 broken (139 files, 500 deps)
+pytest -m unit        → 695/695 tests passed (584 existing + 111 new)
+```
+
+> **Checkpoint 3 reached:** Layer 2 domain packages complete. Two bounded contexts (`tenancy`, `identity`) fully extracted with aggregates, application services, infrastructure, and 111 new unit tests. Architecture contracts pass. 695 total tests green.
+
+---
+
+## Phase 4–5: Not yet started
 
 See [extraction plan](./praecepta-extraction-plan.md) §6 for full phase breakdown.

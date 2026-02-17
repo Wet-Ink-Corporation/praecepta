@@ -407,7 +407,7 @@ def decode(self, data: str) -> Tag:
 
 ## Related Decisions
 
-- [PADR-109: Sync-First Event Sourcing](../09-decisions/patterns/PADR-109-sync-first-eventsourcing.md) — Event sourcing patterns
+- [PADR-109: Sync-First Event Sourcing](../../decisions/patterns/PADR-109-sync-first-eventsourcing.md) — Event sourcing patterns
 
 ---
 

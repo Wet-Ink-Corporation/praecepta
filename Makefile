@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-int lint format typecheck boundaries verify install help
+.PHONY: test test-unit test-int lint format typecheck boundaries verify install docs docs-dev help
 
 test:           ## Run all tests
 	uv run pytest
@@ -31,6 +31,14 @@ verify:         ## Full verification (lint + format + typecheck + boundaries + t
 
 install:        ## Install all dependencies
 	uv sync --dev
+
+# ── Docs ──────────────────────────────────────────────────────────────
+
+docs:           ## Build documentation site (MkDocs + shadcn)
+	uv run mkdocs build -f docs/mkdocs.yml
+
+docs-dev:       ## Start docs dev server
+	uv run mkdocs serve -f docs/mkdocs.yml
 
 # ── Help ─────────────────────────────────────────────────────────────
 

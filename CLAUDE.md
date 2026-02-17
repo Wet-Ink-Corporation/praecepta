@@ -14,10 +14,12 @@ make verify         # Full check: lint + typecheck + boundaries + test
 make test           # uv run pytest (all tests)
 make test-unit      # uv run pytest -m unit
 make test-int       # uv run pytest -m integration
-make lint           # uv run ruff check packages/ tests/ --fix
-make format         # uv run ruff format packages/ tests/
+make lint           # uv run ruff check packages/ tests/ examples/ --fix
+make format         # uv run ruff format packages/ tests/ examples/
 make typecheck      # uv run mypy (strict mode)
 make boundaries     # uv run lint-imports (architecture boundary contracts)
+make docs           # Build documentation site (MkDocs + shadcn)
+make docs-dev       # Start docs dev server
 ```
 
 Run a single test file: `uv run pytest path/to/test_file.py`
@@ -38,6 +40,8 @@ Layer 0: Foundation    praecepta.foundation.*     (pure domain primitives)
 
 Foundation packages must never import infrastructure frameworks (fastapi, sqlalchemy, httpx, structlog, opentelemetry, taskiq, redis).
 
+**Accepted exception:** Domain packages (Layer 2) may depend on `praecepta-infra-eventsourcing` (Layer 1) for `Application` and `BaseProjection` base classes. These are structural dependencies required by the eventsourcing pattern — application services extend `Application[UUID]` and projections extend `BaseProjection`. Extracting these into separate packages would create excessive proliferation without meaningful architectural benefit.
+
 ### Package Layout Convention
 
 Each package follows this structure:
@@ -57,6 +61,17 @@ Intermediate directories (`praecepta/`, `praecepta/foundation/`, etc.) must **no
 ### Inter-Package Dependencies
 
 Workspace packages reference each other via `[tool.uv.sources]` with `workspace = true` in both the root and individual `pyproject.toml` files. The build backend is hatchling.
+
+### Entry-Point Auto-Discovery
+
+The app factory (`create_app()`) uses Python entry points for plugin-style auto-discovery (PADR-122). Packages register contributions in their `pyproject.toml` under `[project.entry-points]`:
+
+- `praecepta.applications` — Application service singletons
+- `praecepta.projections` — Event projection handlers
+- `praecepta.middleware` — Middleware contributions (ordering via `MiddlewareContribution`)
+- `praecepta.lifespan` — App lifespan hooks (`LifespanContribution`)
+- `praecepta.routers` — FastAPI router mounts
+- `praecepta.error_handlers` — Exception-to-HTTP-status mappers
 
 ### Packages
 
@@ -81,3 +96,15 @@ Workspace packages reference each other via `[tool.uv.sources]` with `workspace 
 - mypy in strict mode with `namespace_packages = true` and `explicit_package_bases = true`
 - pytest markers: `unit`, `integration`, `slow`; async mode is `strict`
 - All `uv run` prefix required for tool invocations (ruff, mypy, pytest, lint-imports)
+
+## Adding a New Package
+
+When adding a new package to the monorepo, update the following locations:
+
+1. **Create the package directory** following the layout convention above
+2. **Root `pyproject.toml`** — update three sections:
+   - `[project] dependencies` — add the new package name
+   - `[tool.uv.sources]` — add `package-name = { workspace = true }`
+   - `[tool.mypy] mypy_path` — append `packages/{name}/src` to the colon-separated path
+3. **This file** — add the package to the Packages table above
+4. **Verify** — run `make verify` to confirm lint, types, boundaries, and tests all pass

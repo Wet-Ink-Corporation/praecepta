@@ -25,3 +25,4 @@ Agent-orchestrated development using tiered context architecture. Agents navigat
 | `references/workflow-evolution-spec.md` | Improving agent orchestration workflows |
 | `references/proc-when-stuck-protocol.md` | Agent is stuck or blocked |
 | `references/agent-skill-design-guidelines.md` | Creating or updating agent skills |
+| `references/ref-project-execution-patterns.md` | Project execution patterns and practices |

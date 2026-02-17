@@ -493,8 +493,8 @@ category = get_category("org")
 
 ## Related Decisions
 
-- [PADR-112: Module-Level Registry Pattern](../09-decisions/patterns/PADR-112-module-level-registry.md) — Formalization of this convention
-- [PADR-108: Domain Service Protocols](../09-decisions/patterns/PADR-108-domain-service-protocols.md) — Pure function protocols
+- [PADR-112: Module-Level Registry Pattern](../../decisions/patterns/PADR-112-module-level-registry.md) — Formalization of this convention
+- [PADR-108: Domain Service Protocols](../../decisions/patterns/PADR-108-domain-service-protocols.md) — Pure function protocols
 
 ---
 

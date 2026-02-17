@@ -26,6 +26,23 @@ class TenantStatus(StrEnum):
     DECOMMISSIONED = "DECOMMISSIONED"
 
 
+class SuspensionCategory(StrEnum):
+    """Machine-readable suspension categories.
+
+    Consumers can use these to drive automated remediation workflows
+    (e.g., auto-reactivate on payment for BILLING_HOLD).
+
+    This is a base set — consumers may pass any string value as a
+    category. These constants provide well-known defaults.
+    """
+
+    ADMIN_ACTION = "admin_action"
+    BILLING_HOLD = "billing_hold"
+    SECURITY_REVIEW = "security_review"
+    TERMS_VIOLATION = "terms_violation"
+    OTHER = "other"
+
+
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
 
 

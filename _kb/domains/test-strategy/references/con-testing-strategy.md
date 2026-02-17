@@ -710,6 +710,5 @@ pytest tests/unit -n auto
 
 ## See Also
 
-- [PADR-104: Testing Strategy](../09-decisions/patterns/PADR-104-testing-strategy.md)
-- [Architecture Patterns](../04-solution-strategy/con-architecture-patterns.md)
+- [PADR-104: Testing Strategy](../../decisions/patterns/PADR-104-testing-strategy.md)
 - [Error Handling](con-error-handling.md) - Testing error paths

@@ -191,6 +191,6 @@ The `idx_slug_registry_unconfirmed` partial index makes this query efficient.
 
 ## Related
 
-- [PADR-001: Event Sourcing](../../09-decisions/PADR-001-event-sourcing.md) — Why aggregates use UUIDs, not slugs
-- [ref-shared-interactions.md](../05-building-blocks/bounded-contexts/ref-shared-interactions.md) — Tenant provisioning sequence diagram
+- [PADR-001: Event Sourcing](../../decisions/strategic/PADR-001-event-sourcing.md) — Why aggregates use UUIDs, not slugs
+- [ref-shared-interactions.md](ref-shared-interactions.md) — Tenant provisioning sequence diagram
 - [ref-domain-aggregate-lifecycle.md](ref-domain-aggregate-lifecycle.md) — Aggregate state machine pattern

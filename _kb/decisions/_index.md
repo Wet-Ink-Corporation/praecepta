@@ -2,6 +2,9 @@
 
 25 PADRs governing praecepta framework architecture. Renumbered from source project ADRs.
 
+> **Numbering convention:** Strategic decisions use 001–0xx, pattern decisions use 101–1xx.
+> PADR-003 and PADR-117 were intentionally skipped during renumbering from the source project.
+
 ## Strategic Decisions
 
 | PADR | Title | Status |

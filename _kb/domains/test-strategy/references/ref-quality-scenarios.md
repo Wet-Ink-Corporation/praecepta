@@ -470,4 +470,4 @@ Onboarding Support:
 
 - [Quality Tree](ref-quality-tree.md) - Quality attribute hierarchy
 - [Quality Measures](con-quality-measures.md) - Measurement approach
-- [Testing Strategy](../08-crosscutting/con-testing-strategy.md) - Test implementation
+- [Testing Strategy](con-testing-strategy.md) - Test implementation
