@@ -1,8 +1,8 @@
 site_name: Praecepta
-site_url: https://praecepta.dev
+site_url: https://wet-ink-corporation.github.io/praecepta/
 site_description: Composable Python framework for DDD/ES multi-tenant applications
-repo_url: https://github.com/wetink/praecepta
-repo_name: wetink/praecepta
+repo_url: https://github.com/wet-ink-corporation/praecepta
+repo_name: wet-ink-corporation/praecepta
 
 theme:
   name: shadcn
