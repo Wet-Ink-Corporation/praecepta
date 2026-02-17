@@ -6,6 +6,9 @@ repo_name: wet-ink-corporation/praecepta
 
 theme:
   name: shadcn
+  pygments_style:
+    light: github-light
+    dark: github-dark
 
 nav:
   - Home: index.md
@@ -102,9 +105,7 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - toc:
-      permalink: true
+  - codehilite:
+      guess_lang: false
+  - toc
   - tables

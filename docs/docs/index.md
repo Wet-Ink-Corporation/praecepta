@@ -2,8 +2,7 @@
 
 Build Domain-Driven Design / Event Sourcing multi-tenant applications in Python with composable, layered packages.
 
-[Get Started](getting-started/installation.md){ .md-button .md-button--primary }
-[View on GitHub](https://github.com/wetink/praecepta){ .md-button }
+**[Get Started →](getting-started/installation.md)** | [View on GitHub](https://github.com/wet-ink-corporation/praecepta)
 
 ---
 
