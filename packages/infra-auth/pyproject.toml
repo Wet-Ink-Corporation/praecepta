@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-infra-auth"
-version = "0.1.0"
+version = "0.2.0"
 description = "Authentication adapters for praecepta — JWT, JWKS, PKCE, auth middleware"
 requires-python = ">=3.12"
 license = { text = "MIT" }

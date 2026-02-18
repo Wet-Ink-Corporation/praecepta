@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-infra-eventsourcing"
-version = "0.1.0"
+version = "0.2.0"
 description = "Event store factory, projections, and config for praecepta"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -26,6 +26,7 @@ build-backend = "hatchling.build"
 
 [project.entry-points."praecepta.lifespan"]
 event_store = "praecepta.infra.eventsourcing:lifespan_contribution"
+projection_runner = "praecepta.infra.eventsourcing:projection_lifespan_contribution"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/praecepta"]
