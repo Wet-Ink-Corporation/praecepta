@@ -101,11 +101,10 @@ plugins:
 
 markdown_extensions:
   - admonition
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.tabbed:
-      alternate_style: true
-  - codehilite:
-      guess_lang: false
-  - toc
+  - codehilite
+  - fenced_code
+  - footnotes
   - tables
+  - toc
+  - pymdownx.tabbed
+  - pymdownx.blocks.details

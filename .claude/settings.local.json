@@ -5,7 +5,11 @@
       "Bash(uv run mypy:*)",
       "Bash(uv run:*)",
       "Bash(gh run list:*)",
-      "Bash(make install:*)"
+      "Bash(make install:*)",
+      "WebFetch(domain:wet-ink-corporation.github.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:asiffer.github.io)"
     ]
   }
 }
