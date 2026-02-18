@@ -200,3 +200,38 @@ class EventSourcingSettings(BaseSettings):
             "POSTGRES_PRE_PING": "y" if self.postgres_pre_ping else "",
             "POSTGRES_SINGLE_ROW_TRACKING": "y" if self.postgres_single_row_tracking else "",
         }
+
+
+class ProjectionPollingSettings(BaseSettings):
+    """Configuration for projection polling behaviour.
+
+    Controls how the ``ProjectionPoller`` background thread polls the
+    PostgreSQL notification log for new events.
+
+    Environment Variables:
+        PROJECTION_POLL_INTERVAL: Seconds between poll cycles (default: 1.0)
+        PROJECTION_POLL_TIMEOUT: Max wait for graceful stop (default: 10.0)
+        PROJECTION_POLL_ENABLED: Master switch (default: true)
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="PROJECTION_",
+        extra="ignore",
+    )
+
+    poll_interval: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=60.0,
+        description="Seconds between polling cycles",
+    )
+    poll_timeout: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=120.0,
+        description="Max seconds to wait for graceful shutdown",
+    )
+    poll_enabled: bool = Field(
+        default=True,
+        description="Enable polling (set False to disable projection processing)",
+    )

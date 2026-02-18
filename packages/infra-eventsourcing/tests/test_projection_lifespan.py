@@ -1,4 +1,4 @@
-"""Tests for projection runner auto-discovery lifespan hook."""
+"""Tests for projection poller auto-discovery lifespan hook."""
 
 from __future__ import annotations
 
@@ -165,7 +165,7 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_apps: MagicMock,
     ) -> None:
-        """When no projections found, yield without starting runners."""
+        """When no projections found, yield without starting pollers."""
         mock_proj.return_value = []
         async with projection_runner_lifespan(MagicMock()):
             pass
@@ -179,79 +179,79 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_apps: MagicMock,
     ) -> None:
-        """Projections exist but no applications -> yield without runners."""
+        """Projections exist but no applications -> yield without pollers."""
         mock_proj.return_value = [_StubProjection]
         mock_apps.return_value = []
         async with projection_runner_lifespan(MagicMock()):
             pass
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_one_app_one_projection_starts_and_stops(
         self,
         mock_proj: MagicMock,
         mock_apps: MagicMock,
-        mock_runner_cls: MagicMock,
+        mock_poller_cls: MagicMock,
     ) -> None:
-        """Single app + single projection -> one runner started then stopped."""
+        """Single app + single projection -> one poller started then stopped."""
         mock_proj.return_value = [_StubProjection]
         mock_apps.return_value = [_StubApplication]
-        mock_runner = MagicMock()
-        mock_runner_cls.return_value = mock_runner
+        mock_poller = MagicMock()
+        mock_poller_cls.return_value = mock_poller
 
         async with projection_runner_lifespan(MagicMock()):
-            mock_runner_cls.assert_called_once_with(
+            mock_poller_cls.assert_called_once_with(
                 projections=[_StubProjection],
                 upstream_application=_StubApplication,
             )
-            mock_runner.start.assert_called_once()
-            mock_runner.stop.assert_not_called()
+            mock_poller.start.assert_called_once()
+            mock_poller.stop.assert_not_called()
 
-        mock_runner.stop.assert_called_once()
+        mock_poller.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
-    async def test_multiple_apps_creates_multiple_runners(
+    async def test_multiple_apps_creates_multiple_pollers(
         self,
         mock_proj: MagicMock,
         mock_apps: MagicMock,
-        mock_runner_cls: MagicMock,
+        mock_poller_cls: MagicMock,
     ) -> None:
-        """Multiple applications -> one runner per application."""
+        """Multiple applications -> one poller per application."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
         mock_apps.return_value = [_StubApplication, _AnotherApplication]
-        mock_runners = [MagicMock(), MagicMock()]
-        mock_runner_cls.side_effect = mock_runners
+        mock_pollers = [MagicMock(), MagicMock()]
+        mock_poller_cls.side_effect = mock_pollers
 
         async with projection_runner_lifespan(MagicMock()):
-            assert mock_runner_cls.call_count == 2
-            for runner in mock_runners:
-                runner.start.assert_called_once()
+            assert mock_poller_cls.call_count == 2
+            for poller in mock_pollers:
+                poller.start.assert_called_once()
 
-        for runner in mock_runners:
-            runner.stop.assert_called_once()
+        for poller in mock_pollers:
+            poller.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
-    async def test_each_runner_receives_all_projections(
+    async def test_each_poller_receives_all_projections(
         self,
         mock_proj: MagicMock,
         mock_apps: MagicMock,
-        mock_runner_cls: MagicMock,
+        mock_poller_cls: MagicMock,
     ) -> None:
-        """Each runner receives the complete list of projections."""
+        """Each poller receives the complete list of projections."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
         mock_apps.return_value = [_StubApplication, _AnotherApplication]
-        mock_runner_cls.return_value = MagicMock()
+        mock_poller_cls.return_value = MagicMock()
 
         async with projection_runner_lifespan(MagicMock()):
-            calls = mock_runner_cls.call_args_list
+            calls = mock_poller_cls.call_args_list
             assert calls[0] == (
                 (),
                 {
@@ -268,70 +268,70 @@ class TestProjectionRunnerLifespan:
             )
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_start_failure_propagates(
         self,
         mock_proj: MagicMock,
         mock_apps: MagicMock,
-        mock_runner_cls: MagicMock,
+        mock_poller_cls: MagicMock,
     ) -> None:
-        """If runner.start() raises, the exception propagates."""
+        """If poller.start() raises, the exception propagates."""
         mock_proj.return_value = [_StubProjection]
         mock_apps.return_value = [_StubApplication]
-        mock_runner = MagicMock()
-        mock_runner.start.side_effect = RuntimeError("start failed")
-        mock_runner_cls.return_value = mock_runner
+        mock_poller = MagicMock()
+        mock_poller.start.side_effect = RuntimeError("start failed")
+        mock_poller_cls.return_value = mock_poller
 
         with pytest.raises(RuntimeError, match="start failed"):
             async with projection_runner_lifespan(MagicMock()):
                 pass  # pragma: no cover
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_stop_called_on_exception_during_yield(
         self,
         mock_proj: MagicMock,
         mock_apps: MagicMock,
-        mock_runner_cls: MagicMock,
+        mock_poller_cls: MagicMock,
     ) -> None:
-        """Runners are stopped even if an exception occurs during yield."""
+        """Pollers are stopped even if an exception occurs during yield."""
         mock_proj.return_value = [_StubProjection]
         mock_apps.return_value = [_StubApplication]
-        mock_runner = MagicMock()
-        mock_runner_cls.return_value = mock_runner
+        mock_poller = MagicMock()
+        mock_poller_cls.return_value = mock_poller
 
         with pytest.raises(ValueError, match="app error"):
             async with projection_runner_lifespan(MagicMock()):
                 raise ValueError("app error")
 
-        mock_runner.stop.assert_called_once()
+        mock_poller.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_partial_start_failure_stops_already_started(
         self,
         mock_proj: MagicMock,
         mock_apps: MagicMock,
-        mock_runner_cls: MagicMock,
+        mock_poller_cls: MagicMock,
     ) -> None:
-        """If second runner.start() fails, first runner is still stopped."""
+        """If second poller.start() fails, first poller is still stopped."""
         mock_proj.return_value = [_StubProjection]
         mock_apps.return_value = [_StubApplication, _AnotherApplication]
 
-        runner_ok = MagicMock()
-        runner_fail = MagicMock()
-        runner_fail.start.side_effect = RuntimeError("db connection failed")
-        mock_runner_cls.side_effect = [runner_ok, runner_fail]
+        poller_ok = MagicMock()
+        poller_fail = MagicMock()
+        poller_fail.start.side_effect = RuntimeError("db connection failed")
+        mock_poller_cls.side_effect = [poller_ok, poller_fail]
 
         with pytest.raises(RuntimeError, match="db connection failed"):
             async with projection_runner_lifespan(MagicMock()):
                 pass  # pragma: no cover
 
-        runner_ok.stop.assert_called_once()
-        runner_fail.stop.assert_not_called()
+        poller_ok.stop.assert_called_once()
+        poller_fail.stop.assert_not_called()

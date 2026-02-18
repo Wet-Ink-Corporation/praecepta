@@ -53,6 +53,18 @@ CREATE TABLE order_summaries (
 );
 ```
 
+## The `clear_read_model` Contract
+
+Every projection must implement `clear_read_model()`. This method drops and recreates the projection's read model tables. It is called by `ProjectionRebuilder` when a projection needs to be rebuilt from scratch (e.g. after a schema change or logic fix):
+
+```python
+class OrderSummaryProjection(BaseProjection):
+    def clear_read_model(self) -> None:
+        self.execute("DELETE FROM order_summaries")
+
+    # ... handlers
+```
+
 ## Registering Projections
 
 Register projections via entry points in `pyproject.toml`:
@@ -62,7 +74,37 @@ Register projections via entry points in `pyproject.toml`:
 order_summary = "my_app.projections:OrderSummaryProjection"
 ```
 
-The framework discovers and runs projections automatically.
+You also need to register the upstream application(s) that produce events:
+
+```toml
+[project.entry-points."praecepta.applications"]
+orders = "my_app.application:OrderApplication"
+```
+
+The framework discovers both projections and applications at startup and wires them together automatically.
+
+## How Projections Run
+
+At startup, the `projection_runner_lifespan` hook (priority 200) discovers all registered projections and applications, then creates a `ProjectionPoller` for each application. Each poller:
+
+1. Creates an internal eventsourcing `System` that wires projections to the upstream application
+2. Starts a **background polling thread** that periodically calls `pull_and_process()` on each projection
+3. `pull_and_process()` reads new events from the shared **PostgreSQL notification log** and processes them through the projection's handler methods
+4. Each projection tracks its own position in the notification log, so it resumes where it left off after a restart
+
+This polling-based approach works correctly in production where the API process writes events and the projection runner reads them from the shared database — they do not need to be in the same process or share application instances.
+
+### Configuring the Poller
+
+The polling behaviour is controlled via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PROJECTION_POLL_INTERVAL` | `1.0` | Seconds between poll cycles (0.1–60) |
+| `PROJECTION_POLL_TIMEOUT` | `10.0` | Max seconds for graceful shutdown (1–120) |
+| `PROJECTION_POLL_ENABLED` | `true` | Set to `false` to disable projection processing |
+
+For most deployments the defaults are fine. Lower the poll interval if you need faster eventual consistency; raise it to reduce database polling overhead.
 
 ## Projection Execution Model
 

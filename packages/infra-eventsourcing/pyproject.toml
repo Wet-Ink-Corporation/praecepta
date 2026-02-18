@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-infra-eventsourcing"
-version = "0.2.0"
+version = "0.3.0"
 description = "Event store factory, projections, and config for praecepta"
 requires-python = ">=3.12"
 license = { text = "MIT" }

@@ -28,6 +28,7 @@ nav:
     - Build a Projection: guides/build-projection.md
     - Add an API Endpoint: guides/add-api-endpoint.md
     - Multi-Tenancy: guides/multi-tenancy.md
+    - Production Configuration: guides/production-configuration.md
     - Testing: guides/testing.md
   - API Reference:
     - Foundation Domain: reference/foundation-domain.md
@@ -85,6 +86,7 @@ plugins:
           - guides/build-projection.md
           - guides/add-api-endpoint.md
           - guides/multi-tenancy.md
+          - guides/production-configuration.md
           - guides/testing.md
         API Reference:
           - reference/foundation-domain.md

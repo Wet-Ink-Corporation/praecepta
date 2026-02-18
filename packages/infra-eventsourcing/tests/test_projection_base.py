@@ -29,8 +29,9 @@ class TestBaseProjectionContract:
 
 
 @pytest.mark.unit
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestProjectionRunner:
-    """Tests for ProjectionRunner lifecycle."""
+    """Tests for ProjectionRunner lifecycle (deprecated, use ProjectionPoller)."""
 
     def test_not_running_initially(self) -> None:
         runner = ProjectionRunner(
@@ -38,6 +39,13 @@ class TestProjectionRunner:
             upstream_application=MagicMock,
         )
         assert not runner.is_running
+
+    def test_emits_deprecation_warning(self) -> None:
+        with pytest.warns(DeprecationWarning, match="ProjectionPoller"):
+            ProjectionRunner(
+                projections=[],
+                upstream_application=MagicMock,
+            )
 
     def test_get_raises_when_not_started(self) -> None:
         runner = ProjectionRunner(

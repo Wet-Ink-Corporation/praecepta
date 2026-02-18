@@ -78,6 +78,20 @@ Middleware is sorted by priority (lower = outermost in the ASGI stack):
 | Policy | 300–399 | Enforcement | Rate limiting, resource limits |
 | Default | 500 | Unspecified | — |
 
+## Lifespan Priority Bands
+
+Lifespan hooks are sorted by priority (lower starts first, shuts down last):
+
+| Band | Range | Purpose | Examples |
+|------|-------|---------|----------|
+| Infrastructure | 0–99 | Core infrastructure setup | Database migrations, connection pools |
+| Event Sourcing | 100–199 | Event store and configuration | `event_store_lifespan` (100) |
+| Projections | 200–299 | Event projection runners | `projection_runner_lifespan` (200) |
+| Application | 300–399 | Application-level services | Background workers, caches |
+| Default | 500 | Unspecified | — |
+
+The built-in eventsourcing hooks use priorities 100 and 200 to ensure the event store environment is bridged before projection pollers attempt to construct `Application` instances.
+
 ## Discovery Sequence
 
 `create_app()` wires contributions in this order:

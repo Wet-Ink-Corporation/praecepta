@@ -38,6 +38,7 @@ See Also:
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -96,6 +97,12 @@ class ProjectionRunner:
             env: Optional environment variables for configuration.
                 Passed to the eventsourcing library for infrastructure config.
         """
+        warnings.warn(
+            "ProjectionRunner uses in-process SingleThreadedRunner which does not work "
+            "for cross-process event consumption. Use ProjectionPoller instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._projections = projections
         self._upstream_application = upstream_application
         self._runner_class = runner_class

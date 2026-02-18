@@ -5,11 +5,13 @@ projections that consume domain events and maintain read models.
 """
 
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
+from praecepta.infra.eventsourcing.projections.poller import ProjectionPoller
 from praecepta.infra.eventsourcing.projections.rebuilder import ProjectionRebuilder
 from praecepta.infra.eventsourcing.projections.runner import ProjectionRunner
 
 __all__ = [
     "BaseProjection",
+    "ProjectionPoller",
     "ProjectionRebuilder",
     "ProjectionRunner",
 ]

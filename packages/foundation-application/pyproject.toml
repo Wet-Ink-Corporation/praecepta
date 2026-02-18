@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-foundation-application"
-version = "0.2.0"
+version = "0.3.0"
 description = "Application layer patterns for DDD/ES multi-tenant applications"
 requires-python = ">=3.12"
 license = { text = "MIT" }

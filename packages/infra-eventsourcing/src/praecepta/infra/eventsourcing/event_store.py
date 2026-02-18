@@ -1,11 +1,34 @@
-"""Event store factory for eventsourcing library configuration.
+"""Event store factory for direct event store access.
 
 Provides a high-level wrapper around eventsourcing's InfrastructureFactory
-with support for:
-- Pydantic settings validation
-- DATABASE_URL parsing for compatibility with other tools
-- Environment-based configuration
-- Connection pooling setup
+with support for Pydantic settings validation, DATABASE_URL parsing, and
+connection pooling setup.
+
+Architecture Note
+-----------------
+There are two paths to event store infrastructure in praecepta:
+
+1. **EventStoreFactory / get_event_store()** (this module):
+   For direct event store access outside of ``Application`` subclasses.
+   Use cases: projection rebuilds, admin queries, event stream inspection.
+   Creates its own ``PostgresInfrastructureFactory`` lazily on first
+   ``.recorder`` access — no connection pool exists until then.
+
+2. **Application[UUID] subclasses** (eventsourcing library):
+   Each ``Application`` subclass (e.g. ``TenantApplication``) constructs
+   its own ``InfrastructureFactory`` from ``os.environ`` during
+   ``__init__()``.  These are independent of ``EventStoreFactory``.
+
+These two paths create **separate** connection pools.  The
+``event_store_lifespan`` hook (priority 100) bridges
+``EventSourcingSettings`` into ``os.environ`` so that ``Application``
+subclasses receive the correct configuration.  The ``EventStoreFactory``
+singleton is available via ``get_event_store()`` for non-Application use
+cases.
+
+If your code only uses ``Application`` subclasses for all event store
+operations, the ``EventStoreFactory`` connection pool is never created
+(lazy initialisation).
 
 Example:
     >>> from praecepta.infra.eventsourcing import get_event_store
@@ -198,10 +221,18 @@ class EventStoreFactory:
 # Global singleton factory (cached)
 @lru_cache(maxsize=1)
 def get_event_store() -> EventStoreFactory:
-    """Get cached event store factory instance.
+    """Get cached event store factory instance for direct access.
 
-    This is the primary entry point for accessing the event store in
-    application code. The factory is cached as a singleton.
+    This is the entry point for accessing the event store **outside** of
+    ``Application`` subclasses.  ``Application[UUID]`` subclasses
+    (``TenantApplication``, ``UserApplication``, etc.) do **not** use this
+    factory — they construct their own infrastructure from ``os.environ``.
+
+    Use this factory for direct event store operations such as projection
+    rebuilds, admin queries, or event stream inspection.
+
+    The factory is lazy — no database connection is created until
+    ``.recorder`` is first accessed.
 
     Returns:
         Singleton EventStoreFactory instance.
