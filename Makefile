@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-int lint format typecheck boundaries verify install docs docs-dev changelog changelog-preview bump-patch bump-minor bump-major help
+.PHONY: test test-unit test-int lint format typecheck boundaries verify install docs docs-dev changelog changelog-preview bump bump-patch bump-minor bump-major help
 
 test:           ## Run all tests
 	uv run pytest
@@ -48,6 +48,9 @@ changelog:          ## Generate CHANGELOG.md from full git history
 
 changelog-preview:  ## Preview unreleased changes (dry run)
 	uv run cz changelog --dry-run --unreleased-version "Unreleased"
+
+bump:               ## Bump version (auto-detect from commits: feat=minor, fix=patch)
+	uv run cz bump --changelog
 
 bump-patch:         ## Bump patch version (e.g., 0.3.0 -> 0.3.1)
 	uv run cz bump --patch --changelog

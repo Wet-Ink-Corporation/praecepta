@@ -22,6 +22,7 @@ make docs              # Build documentation site (MkDocs + shadcn)
 make docs-dev          # Start docs dev server
 make changelog         # Generate CHANGELOG.md from git history
 make changelog-preview # Preview unreleased changes
+make bump             # Bump version auto-detected from commits (creates commit + tag)
 make bump-patch        # Bump patch version (creates commit + tag)
 make bump-minor        # Bump minor version (creates commit + tag)
 make bump-major        # Bump major version (creates commit + tag)

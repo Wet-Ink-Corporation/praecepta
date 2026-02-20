@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump type"
+        description: "Version bump type (auto = determine from commits)"
         required: true
         type: choice
         options:
+          - auto
           - patch
           - minor
           - major
@@ -53,7 +54,11 @@ jobs:
 
       - name: Bump version and generate changelog
         run: |
-          uv run cz bump --${{ inputs.bump }} --changelog --changelog-to-stdout > body.md
+          BUMP_ARG=""
+          if [ "${{ inputs.bump }}" != "auto" ]; then
+            BUMP_ARG="--${{ inputs.bump }}"
+          fi
+          uv run cz bump $BUMP_ARG --changelog --changelog-to-stdout > body.md
 
       - name: Get new version
         id: version
