@@ -9,7 +9,12 @@
       "WebFetch(domain:wet-ink-corporation.github.io)",
       "WebFetch(domain:github.com)",
       "Bash(gh api:*)",
-      "WebFetch(domain:asiffer.github.io)"
+      "WebFetch(domain:asiffer.github.io)",
+      "Bash(make verify:*)",
+      "Bash(for f in packages/*/pyproject.toml)",
+      "Bash(do sed -i 's/^version = \"\"0.2.0\"\"/version = \"\"0.3.0\"\"/' \"$f\")",
+      "Bash(done)",
+      "Bash(grep:*)"
     ]
   }
 }
