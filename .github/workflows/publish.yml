@@ -53,8 +53,20 @@ jobs:
           VIRTUAL_ENV=/tmp/verify-env uv pip install dist/*.whl
           VIRTUAL_ENV=/tmp/verify-env uv pip list | grep praecepta
 
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          # Extract the section for this tag from CHANGELOG.md
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          # Use awk to extract the section between this version header and the next
+          awk "/^## ${VERSION}/,/^## [0-9]/" CHANGELOG.md | head -n -1 > RELEASE_NOTES.md
+          # Fallback if extraction fails
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "See [CHANGELOG.md](https://github.com/wet-ink-corporation/praecepta/blob/main/CHANGELOG.md) for details." > RELEASE_NOTES.md
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md

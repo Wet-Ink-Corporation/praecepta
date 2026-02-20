@@ -41,6 +41,8 @@ nav:
     - Domain Tenancy: reference/domain-tenancy.md
     - Domain Identity: reference/domain-identity.md
   - Decisions: decisions.md
+  - Releases:
+    - Overview: releases/index.md
 
 plugins:
   - search

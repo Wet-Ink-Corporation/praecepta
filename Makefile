@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-int lint format typecheck boundaries verify install docs docs-dev help
+.PHONY: test test-unit test-int lint format typecheck boundaries verify install docs docs-dev changelog changelog-preview bump-patch bump-minor bump-major help
 
 test:           ## Run all tests
 	uv run pytest
@@ -29,8 +29,9 @@ verify:         ## Full verification (lint + format + typecheck + boundaries + t
 	uv run lint-imports
 	uv run pytest
 
-install:        ## Install all dependencies
+install:        ## Install all dependencies and git hooks
 	uv sync --dev
+	uv run pre-commit install --hook-type commit-msg
 
 # ── Docs ──────────────────────────────────────────────────────────────
 
@@ -39,6 +40,23 @@ docs:           ## Build documentation site (MkDocs + shadcn)
 
 docs-dev:       ## Start docs dev server
 	uv run mkdocs serve -f docs/mkdocs.yml
+
+# ── Release & Changelog ──────────────────────────────────────────────
+
+changelog:          ## Generate CHANGELOG.md from full git history
+	uv run cz changelog
+
+changelog-preview:  ## Preview unreleased changes (dry run)
+	uv run cz changelog --dry-run --unreleased-version "Unreleased"
+
+bump-patch:         ## Bump patch version (e.g., 0.3.0 -> 0.3.1)
+	uv run cz bump --patch --changelog
+
+bump-minor:         ## Bump minor version (e.g., 0.3.0 -> 0.4.0)
+	uv run cz bump --minor --changelog
+
+bump-major:         ## Bump major version (e.g., 0.3.0 -> 1.0.0)
+	uv run cz bump --major --changelog
 
 # ── Help ─────────────────────────────────────────────────────────────
 

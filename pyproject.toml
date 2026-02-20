@@ -62,6 +62,8 @@ dev = [
     "mypy>=1.8",
     "ruff>=0.1",
     "import-linter>=2.0",
+    "pre-commit>=4.0",
+    "commitizen>=4.0",
 ]
 docs = [
     "mkdocs>=1.6",
@@ -212,4 +214,30 @@ layers = [
     "praecepta.domain",
     "praecepta.infra",
     "praecepta.foundation",
+]
+
+# =============================================================================
+# Commitizen - Versioning & Changelog
+# =============================================================================
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.3.0"
+tag_format = "v$version"
+update_changelog_on_bump = true
+changelog_start_rev = "v0.1.0"
+version_files = [
+    "pyproject.toml:^version",
+    "packages/foundation-domain/pyproject.toml:^version",
+    "packages/foundation-application/pyproject.toml:^version",
+    "packages/infra-fastapi/pyproject.toml:^version",
+    "packages/infra-eventsourcing/pyproject.toml:^version",
+    "packages/infra-auth/pyproject.toml:^version",
+    "packages/infra-persistence/pyproject.toml:^version",
+    "packages/infra-observability/pyproject.toml:^version",
+    "packages/infra-taskiq/pyproject.toml:^version",
+    "packages/domain-tenancy/pyproject.toml:^version",
+    "packages/domain-identity/pyproject.toml:^version",
+    "packages/integration-tenancy-identity/pyproject.toml:^version",
+    "CLAUDE.md:pre-alpha",
 ]
