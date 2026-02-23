@@ -53,14 +53,26 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version and generate changelog
+        id: bump
         run: |
           BUMP_ARG=""
           if [ "${{ inputs.bump }}" != "auto" ]; then
             BUMP_ARG="--${{ inputs.bump }}"
           fi
-          uv run cz bump $BUMP_ARG --changelog --changelog-to-stdout > body.md
+          if uv run cz bump $BUMP_ARG --changelog --changelog-to-stdout > body.md 2>&1; then
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          else
+            if [ "${{ inputs.bump }}" = "auto" ]; then
+              echo "::notice::No bump-eligible commits found since last tag (only feat/fix/breaking trigger auto bumps). Skipping release."
+              echo "bumped=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::cz bump --${{ inputs.bump }} failed"
+              exit 1
+            fi
+          fi
 
       - name: Get new version
+        if: steps.bump.outputs.bumped == 'true'
         id: version
         run: |
           VERSION=$(uv run cz version --project)
@@ -69,7 +81,7 @@ jobs:
           echo "Released version: $VERSION"
 
       - name: Generate release blog post
-        if: inputs.generate_blog_post
+        if: steps.bump.outputs.bumped == 'true' && inputs.generate_blog_post
         run: |
           mkdir -p docs/docs/releases
           RELEASE_DATE=$(date +%Y-%m-%d)
@@ -96,10 +108,12 @@ jobs:
           git tag -f "v${VERSION}" -m "Release v${VERSION}"
 
       - name: Push release
+        if: steps.bump.outputs.bumped == 'true'
         run: |
           git push origin main --follow-tags
 
       - name: Upload release notes artifact
+        if: steps.bump.outputs.bumped == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-notes
