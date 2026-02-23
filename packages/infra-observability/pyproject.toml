@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-infra-observability"
-version = "0.3.0"
+version = "1.0.0"
 description = "Logging and tracing for praecepta — structlog + OpenTelemetry"
 requires-python = ">=3.12"
 license = { text = "MIT" }

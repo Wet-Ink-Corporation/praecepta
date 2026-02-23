@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Praecepta is a composable Python framework for building DDD/ES (Domain-Driven Design / Event Sourcing) multi-tenant applications. It is a uv workspaces monorepo containing 11 packages, currently in pre-alpha (v0.3.0) with stub scaffolding in place.
+Praecepta is a composable Python framework for building DDD/ES (Domain-Driven Design / Event Sourcing) multi-tenant applications. It is a uv workspaces monorepo containing 11 packages, currently in pre-alpha (v1.0.0) with stub scaffolding in place.
 
 ## Commands
 

@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-infra-persistence"
-version = "0.3.0"
+version = "1.0.0"
 description = "Database infrastructure for praecepta — session factories, RLS helpers, tenant context"
 requires-python = ">=3.12"
 license = { text = "MIT" }

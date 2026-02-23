@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-integration-tenancy-identity"
-version = "0.3.0"
+version = "1.0.0"
 description = "Cross-domain integration between tenancy and identity for praecepta"
 requires-python = ">=3.12"
 license = { text = "MIT" }
