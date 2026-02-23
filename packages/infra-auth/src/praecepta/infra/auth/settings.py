@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -89,6 +89,17 @@ class AuthSettings(BaseSettings):
         default="openid email profile",
         description="OAuth scopes requested during authorization",
     )
+
+    @model_validator(mode="after")
+    def _validate_issuer_format(self) -> AuthSettings:
+        """Enforce HTTPS issuer URL when not in dev bypass mode."""
+        if not self.dev_bypass and self.issuer and not self.issuer.startswith("https://"):
+            msg = (
+                "AUTH_ISSUER must be an HTTPS URL when dev_bypass is disabled. "
+                f"Got: {self.issuer!r}"
+            )
+            raise ValueError(msg)
+        return self
 
     def validate_oauth_config(self) -> None:
         """Validate OAuth configuration completeness.

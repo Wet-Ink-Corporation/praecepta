@@ -27,6 +27,12 @@ class TestBaseProjectionContract:
     def test_has_get_projection_name(self) -> None:
         assert hasattr(BaseProjection, "get_projection_name")
 
+    def test_has_upstream_application_attribute(self) -> None:
+        assert hasattr(BaseProjection, "upstream_application")
+
+    def test_upstream_application_defaults_to_none(self) -> None:
+        assert BaseProjection.upstream_application is None
+
 
 @pytest.mark.unit
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -510,7 +509,7 @@ async def unhandled_exception_handler(
     )
 
     # Build response based on debug mode
-    debug_mode = os.environ.get("DEBUG", "").lower() in ("true", "1", "yes")
+    debug_mode = getattr(request.app, "debug", False)
 
     if debug_mode:
         detail = f"{type(exc).__name__}: {exc}"

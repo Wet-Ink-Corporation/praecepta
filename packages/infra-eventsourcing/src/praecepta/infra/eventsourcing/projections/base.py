@@ -14,6 +14,8 @@ Example:
         class SummaryProjection(BaseProjection):
             '''Maintains a summary read model.'''
 
+            upstream_application = MyApplication
+
             @singledispatchmethod
             def policy(self, domain_event, processing_event):
                 '''Default: ignore unknown events.'''
@@ -37,7 +39,7 @@ Idempotency Requirement:
     deduplication tables to ensure reprocessing produces the same result.
 
 See Also:
-    - praecepta.infra.eventsourcing.projections.runner: Lifecycle management
+    - praecepta.infra.eventsourcing.projections.subscription_runner: Lifecycle management
     - praecepta.infra.eventsourcing.projections.rebuilder: Rebuild utilities
 """
 
@@ -45,13 +47,13 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
 from eventsourcing.system import ProcessApplication
 
 if TYPE_CHECKING:
-    from eventsourcing.application import ProcessingEvent
+    from eventsourcing.application import Application, ProcessingEvent
     from eventsourcing.domain import DomainEvent
 
 
@@ -60,32 +62,30 @@ class BaseProjection(ProcessApplication[UUID]):
 
     Extends eventsourcing.system.ProcessApplication with:
     - Abstract clear_read_model() for rebuild support
+    - Upstream application declaration for correct wiring
     - Name property for tracking identification
     - Topics filtering for selective event subscription
-    - Documentation for correct projection implementation
 
-    All read model projections MUST inherit from this class.
+    All read model projections MUST inherit from this class and declare
+    their ``upstream_application`` class attribute.
 
     Attributes:
+        upstream_application: The Application class that produces events
+            this projection consumes. Subclasses MUST set this to enable
+            correct projection-to-application wiring. When ``None``, the
+            projection will be skipped during auto-discovery with a warning.
         topics: Optional tuple of event topics to filter subscription.
             If empty (default), all events are delivered. Topics use format
             "module.path:ClassName" (from BaseEvent.get_topic()).
 
-    Library Features Available:
-        - @singledispatchmethod for policy routing by event type
-        - Automatic position tracking via tracking table
-        - ProcessingEvent for collecting reaction events
-        - Notification log subscription and polling
-
     See Also:
         - eventsourcing.system.ProcessApplication: Library base class
-        - praecepta.infra.eventsourcing.projections.runner: Lifecycle management
+        - praecepta.infra.eventsourcing.projections.subscription_runner: Lifecycle
         - praecepta.infra.eventsourcing.projections.rebuilder: Rebuild utilities
     """
 
-    # Note: The 'topics' class variable is inherited from EventSourcedProjection.
-    # Subclasses can override to filter events by topic.
-    # Empty tuple (default) means all events are delivered.
+    upstream_application: ClassVar[type[Application[Any]] | None] = None
+    """The upstream application class that produces events this projection consumes."""
 
     def get_projection_name(self) -> str:
         """Get unique projection name for tracking table.

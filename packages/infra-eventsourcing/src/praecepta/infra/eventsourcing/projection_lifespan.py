@@ -1,14 +1,13 @@
-"""Lifespan hook for projection poller auto-discovery and lifecycle.
+"""Lifespan hook for projection runner auto-discovery and lifecycle.
 
-Discovers projection classes and upstream application classes from
-entry points, creates ``ProjectionPoller`` instances, and manages their
-lifecycle (start on app startup, stop on app shutdown).
+Discovers projection classes from entry points, groups them by their
+declared ``upstream_application``, and creates
+``SubscriptionProjectionRunner`` instances that use the eventsourcing
+library's ``EventSourcedProjectionRunner`` for LISTEN/NOTIFY-based
+event delivery.
 
-Each poller runs a background thread that periodically calls
-``pull_and_process()`` on its projections, reading new events from the
-shared PostgreSQL notification log.  This replaces the previous
-``ProjectionRunner`` approach which relied on in-process
-``SingleThreadedRunner`` prompts that do not work cross-process.
+Each runner creates ONE upstream application instance and subscribes
+to its recorder for near-instant event processing.
 
 Priority 200 ensures projections start AFTER the event store (priority 100)
 is initialised, since projections depend on the event store infrastructure.
@@ -17,12 +16,16 @@ is initialised, since projections depend on the event store infrastructure.
 from __future__ import annotations
 
 import logging
+import os
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from praecepta.foundation.application import LifespanContribution, discover
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
-from praecepta.infra.eventsourcing.projections.poller import ProjectionPoller
+from praecepta.infra.eventsourcing.projections.subscription_runner import (
+    SubscriptionProjectionRunner,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -30,7 +33,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 GROUP_PROJECTIONS = "praecepta.projections"
-GROUP_APPLICATIONS = "praecepta.applications"
 
 
 def _discover_projections() -> list[type[BaseProjection]]:
@@ -55,42 +57,48 @@ def _discover_projections() -> list[type[BaseProjection]]:
     return projections
 
 
-def _discover_applications() -> list[type[Any]]:
-    """Discover all registered upstream application classes.
+def _group_projections_by_application(
+    projections: list[type[BaseProjection]],
+) -> dict[type[Any], list[type[BaseProjection]]]:
+    """Group projections by their declared ``upstream_application``.
+
+    Projections without ``upstream_application`` are logged and skipped.
 
     Returns:
-        List of Application classes found via entry points.
+        Mapping of application class to list of projection classes.
     """
-    applications: list[type[Any]] = []
-    for contrib in discover(GROUP_APPLICATIONS):
-        value = contrib.value
-        if isinstance(value, type):
-            applications.append(value)
-            logger.debug("Discovered application: %s (%s)", contrib.name, value.__name__)
-        else:
+    grouped: dict[type[Any], list[type[BaseProjection]]] = defaultdict(list)
+    for proj_cls in projections:
+        app_cls = getattr(proj_cls, "upstream_application", None)
+        if app_cls is None:
             logger.warning(
-                "Entry point %s:%s is not a class, skipping",
-                GROUP_APPLICATIONS,
-                contrib.name,
+                "Projection %s has no upstream_application declared; skipping",
+                proj_cls.__name__,
             )
-    return applications
+            continue
+        grouped[app_cls].append(proj_cls)
+        logger.debug(
+            "Projection %s -> %s",
+            proj_cls.__name__,
+            app_cls.__name__,
+        )
+    return dict(grouped)
 
 
 @asynccontextmanager
 async def projection_runner_lifespan(app: Any) -> AsyncIterator[None]:
-    """Start projection pollers at startup, stop at shutdown.
+    """Start projection runners at startup, stop at shutdown.
 
-    Discovers projection and application classes from entry points.
-    Creates one ``ProjectionPoller`` per upstream application, each with
-    all discovered projections.  Each poller runs a background thread that
-    periodically calls ``pull_and_process()`` to consume events from the
-    shared PostgreSQL notification log.
+    Discovers projection classes from entry points, groups them by their
+    declared ``upstream_application``, and creates one
+    ``SubscriptionProjectionRunner`` per upstream application.  Each
+    runner uses PostgreSQL LISTEN/NOTIFY for event delivery.
 
     Args:
         app: The application instance (unused but required by protocol).
 
     Yields:
-        None -- pollers are active during yield.
+        None -- runners are active during yield.
     """
     projections = _discover_projections()
     if not projections:
@@ -98,47 +106,70 @@ async def projection_runner_lifespan(app: Any) -> AsyncIterator[None]:
         yield
         return
 
-    applications = _discover_applications()
-    if not applications:
+    grouped = _group_projections_by_application(projections)
+    if not grouped:
         logger.warning(
-            "Projections discovered (%d) but no upstream applications found; "
+            "Projections discovered (%d) but none declare upstream_application; "
             "projection runners will not start",
             len(projections),
         )
         yield
         return
 
+    total_projections = sum(len(ps) for ps in grouped.values())
+
+    # Enforce max_projection_runners limit (CF-14)
+    max_runners = int(os.getenv("MAX_PROJECTION_RUNNERS", "8"))
+    if total_projections > max_runners:
+        logger.warning(
+            "Discovered %d projections exceeds max_projection_runners=%d; "
+            "capping to first %d projections",
+            total_projections,
+            max_runners,
+            max_runners,
+        )
+        capped: dict[type[Any], list[type[BaseProjection]]] = {}
+        count = 0
+        for app_cls, app_projections in grouped.items():
+            remaining = max_runners - count
+            if remaining <= 0:
+                break
+            capped[app_cls] = app_projections[:remaining]
+            count += len(capped[app_cls])
+        grouped = capped
+        total_projections = count
+
     logger.info(
         "Starting projection runners: %d application(s), %d projection(s)",
-        len(applications),
-        len(projections),
+        len(grouped),
+        total_projections,
     )
 
-    pollers: list[ProjectionPoller] = []
+    runners: list[SubscriptionProjectionRunner] = []
     try:
-        for app_cls in applications:
-            poller = ProjectionPoller(
-                projections=projections,
+        for app_cls, app_projections in grouped.items():
+            runner = SubscriptionProjectionRunner(
+                projections=app_projections,
                 upstream_application=app_cls,
             )
-            poller.start()
-            pollers.append(poller)
+            runner.start()
+            runners.append(runner)
             logger.info(
-                "Started projection poller for %s with %d projection(s)",
+                "Started subscription runner for %s with %d projection(s)",
                 app_cls.__name__,
-                len(projections),
+                len(app_projections),
             )
     except Exception:
-        logger.exception("Failed to start projection pollers; stopping already-started pollers")
-        for poller in reversed(pollers):
-            poller.stop()
+        logger.exception("Failed to start projection runners; stopping already-started runners")
+        for runner in reversed(runners):
+            runner.stop()
         raise
 
     try:
         yield
     finally:
-        for poller in reversed(pollers):
-            poller.stop()
+        for runner in reversed(runners):
+            runner.stop()
 
 
 projection_lifespan_contribution = LifespanContribution(

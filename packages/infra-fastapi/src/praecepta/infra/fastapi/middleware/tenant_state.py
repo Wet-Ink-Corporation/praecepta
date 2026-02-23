@@ -12,19 +12,14 @@ Design decisions:
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
-
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
 from praecepta.foundation.application import MiddlewareContribution
 from praecepta.foundation.domain import TenantStatus
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
-    from starlette.requests import Request
-    from starlette.responses import Response
+    from collections.abc import Callable
 
 # Default paths excluded from tenant state enforcement.
 DEFAULT_EXCLUDED_PREFIXES: tuple[str, ...] = (
@@ -41,7 +36,15 @@ DEFAULT_EXCLUDED_PREFIXES: tuple[str, ...] = (
 _PROBLEM_MEDIA_TYPE = "application/problem+json"
 
 
-class TenantStateMiddleware(BaseHTTPMiddleware):
+def _extract_header(headers: list[tuple[bytes, bytes]], name: bytes) -> str:
+    """Extract a header value from raw ASGI headers."""
+    for key, value in headers:
+        if key.lower() == name:
+            return value.decode("latin-1")
+    return ""
+
+
+class TenantStateMiddleware:
     """Enforces tenant suspension by blocking API requests.
 
     Request flow:
@@ -52,11 +55,6 @@ class TenantStateMiddleware(BaseHTTPMiddleware):
     5. If checker returns None (cache miss): fail-open (allow request through)
     6. If SUSPENDED or DECOMMISSIONED: return 403 Forbidden
     7. Otherwise: proceed to next handler
-
-    Fail-open rationale:
-    On first request for a tenant (cache empty), the middleware allows the
-    request through. The cache is populated when suspend/reactivate/decommission
-    handlers call set_status(). A TTL ensures eventual eviction of stale entries.
 
     Args:
         app: The ASGI application.
@@ -74,67 +72,82 @@ class TenantStateMiddleware(BaseHTTPMiddleware):
         excluded_prefixes: tuple[str, ...] | None = None,
         tenant_status_checker: Callable[[str], str | None] | None = None,
     ) -> None:
-        super().__init__(app)
+        self.app = app
         self._excluded_prefixes = (
             excluded_prefixes if excluded_prefixes is not None else DEFAULT_EXCLUDED_PREFIXES
         )
         self._check_status = tenant_status_checker
 
-    async def dispatch(
+    async def __call__(
         self,
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        """Check tenant state and block if suspended/decommissioned.
+        scope: dict[str, Any],
+        receive: Callable[..., Any],
+        send: Callable[..., Any],
+    ) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
 
-        Args:
-            request: The incoming HTTP request.
-            call_next: The next middleware/handler in the chain.
+        path = scope.get("path", "")
 
-        Returns:
-            403 JSONResponse if tenant is blocked, otherwise the response
-            from the downstream handler.
-        """
         # 1. Skip excluded paths
-        path = request.url.path
         if any(path.startswith(prefix) for prefix in self._excluded_prefixes):
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # 2. Get tenant slug from header
-        tenant_slug = request.headers.get("X-Tenant-ID", "")
+        headers = scope.get("headers", [])
+        tenant_slug = _extract_header(headers, b"x-tenant-id")
         if not tenant_slug:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # 3. If no checker configured, fail-open
         if self._check_status is None:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # 4. Check tenant state
         status = self._check_status(tenant_slug)
 
-        # 5. Fail-open on cache miss (None means no cached state)
+        # 5. Fail-open on cache miss
         if status is None:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # 6. Block suspended or decommissioned tenants
         if status in (TenantStatus.SUSPENDED.value, TenantStatus.DECOMMISSIONED.value):
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "type": "/errors/tenant-suspended",
-                    "title": "Tenant Suspended",
+            body_content = {
+                "type": "/errors/tenant-suspended",
+                "title": "Tenant Suspended",
+                "status": 403,
+                "detail": (
+                    f"Tenant '{tenant_slug}' is {status.lower()}. "
+                    "Contact your platform administrator."
+                ),
+                "error_code": "TENANT_SUSPENDED",
+            }
+            body_bytes = json.dumps(body_content).encode("utf-8")
+            await send(
+                {
+                    "type": "http.response.start",
                     "status": 403,
-                    "detail": (
-                        f"Tenant '{tenant_slug}' is {status.lower()}. "
-                        "Contact your platform administrator."
-                    ),
-                    "error_code": "TENANT_SUSPENDED",
-                },
-                media_type=_PROBLEM_MEDIA_TYPE,
+                    "headers": [
+                        (b"content-type", _PROBLEM_MEDIA_TYPE.encode("latin-1")),
+                        (b"content-length", str(len(body_bytes)).encode("latin-1")),
+                    ],
+                }
             )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": body_bytes,
+                }
+            )
+            return
 
         # 7. Allow request through
-        return await call_next(request)
+        await self.app(scope, receive, send)
 
 
 # Module-level contribution for auto-discovery via entry points.

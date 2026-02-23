@@ -1,7 +1,8 @@
-"""Tests for projection poller auto-discovery lifespan hook."""
+"""Tests for projection runner auto-discovery lifespan hook."""
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,10 +10,9 @@ import pytest
 from praecepta.foundation.application import LifespanContribution
 from praecepta.foundation.application.discovery import DiscoveredContribution
 from praecepta.infra.eventsourcing.projection_lifespan import (
-    GROUP_APPLICATIONS,
     GROUP_PROJECTIONS,
-    _discover_applications,
     _discover_projections,
+    _group_projections_by_application,
     projection_lifespan_contribution,
     projection_runner_lifespan,
 )
@@ -27,26 +27,41 @@ def _make_contrib(name: str, group: str, value: object) -> DiscoveredContributio
     return DiscoveredContribution(name=name, group=group, value=value)
 
 
+class _StubApplication:
+    """Fake application class for testing."""
+
+    __name__ = "_StubApplication"
+
+
+class _AnotherApplication:
+    """Another fake application class for testing."""
+
+    __name__ = "_AnotherApplication"
+
+
 class _StubProjection(BaseProjection):
-    """Concrete BaseProjection subclass for testing."""
+    """Concrete BaseProjection subclass for testing (with upstream)."""
+
+    upstream_application: ClassVar[type[Any]] = _StubApplication  # type: ignore[assignment]
 
     def clear_read_model(self) -> None:
         pass
 
 
 class _AnotherProjection(BaseProjection):
-    """Another concrete BaseProjection subclass for testing."""
+    """Another concrete BaseProjection subclass for testing (with upstream)."""
+
+    upstream_application: ClassVar[type[Any]] = _AnotherApplication  # type: ignore[assignment]
 
     def clear_read_model(self) -> None:
         pass
 
 
-class _StubApplication:
-    """Fake application class for testing."""
+class _OrphanProjection(BaseProjection):
+    """Projection without upstream_application set."""
 
-
-class _AnotherApplication:
-    """Another fake application class for testing."""
+    def clear_read_model(self) -> None:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -120,34 +135,44 @@ class TestDiscoverProjections:
 
 
 # ---------------------------------------------------------------------------
-# Tests: _discover_applications
+# Tests: _group_projections_by_application
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestDiscoverApplications:
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.discover")
-    def test_returns_application_classes(self, mock_discover: MagicMock) -> None:
-        mock_discover.return_value = [
-            _make_contrib("a1", GROUP_APPLICATIONS, _StubApplication),
-        ]
-        result = _discover_applications()
-        assert result == [_StubApplication]
-        mock_discover.assert_called_once_with(GROUP_APPLICATIONS)
+class TestGroupProjectionsByApplication:
+    def test_groups_by_upstream_application(self) -> None:
+        result = _group_projections_by_application([_StubProjection, _AnotherProjection])
+        assert result == {
+            _StubApplication: [_StubProjection],
+            _AnotherApplication: [_AnotherProjection],
+        }
 
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.discover")
-    def test_filters_non_class(self, mock_discover: MagicMock) -> None:
-        mock_discover.return_value = [
-            _make_contrib("bad", GROUP_APPLICATIONS, "not_a_class"),
-        ]
-        result = _discover_applications()
-        assert result == []
+    def test_multiple_projections_same_app(self) -> None:
+        class _SecondStubProjection(BaseProjection):
+            upstream_application: ClassVar[type[Any]] = _StubApplication  # type: ignore[assignment]
 
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.discover")
-    def test_empty_entry_points(self, mock_discover: MagicMock) -> None:
-        mock_discover.return_value = []
-        result = _discover_applications()
-        assert result == []
+            def clear_read_model(self) -> None:
+                pass
+
+        result = _group_projections_by_application([_StubProjection, _SecondStubProjection])
+        assert result == {
+            _StubApplication: [_StubProjection, _SecondStubProjection],
+        }
+
+    def test_skips_projections_without_upstream(self) -> None:
+        result = _group_projections_by_application([_OrphanProjection])
+        assert result == {}
+
+    def test_empty_input(self) -> None:
+        result = _group_projections_by_application([])
+        assert result == {}
+
+    def test_mixed_valid_and_orphan(self) -> None:
+        result = _group_projections_by_application([_StubProjection, _OrphanProjection])
+        assert result == {
+            _StubApplication: [_StubProjection],
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -158,180 +183,212 @@ class TestDiscoverApplications:
 @pytest.mark.unit
 class TestProjectionRunnerLifespan:
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_no_projections_is_noop(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
     ) -> None:
-        """When no projections found, yield without starting pollers."""
+        """When no projections found, yield without starting runners."""
         mock_proj.return_value = []
         async with projection_runner_lifespan(MagicMock()):
             pass
-        mock_apps.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
-    async def test_no_applications_is_noop(
+    async def test_no_grouped_projections_is_noop(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
+        mock_group: MagicMock,
     ) -> None:
-        """Projections exist but no applications -> yield without pollers."""
-        mock_proj.return_value = [_StubProjection]
-        mock_apps.return_value = []
+        """Projections exist but none declare upstream_application -> noop."""
+        mock_proj.return_value = [_OrphanProjection]
+        mock_group.return_value = {}
         async with projection_runner_lifespan(MagicMock()):
             pass
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_one_app_one_projection_starts_and_stops(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
-        mock_poller_cls: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
     ) -> None:
-        """Single app + single projection -> one poller started then stopped."""
+        """Single app + single projection -> one runner started then stopped."""
         mock_proj.return_value = [_StubProjection]
-        mock_apps.return_value = [_StubApplication]
-        mock_poller = MagicMock()
-        mock_poller_cls.return_value = mock_poller
+        mock_group.return_value = {_StubApplication: [_StubProjection]}
+        mock_runner = MagicMock()
+        mock_runner_cls.return_value = mock_runner
 
         async with projection_runner_lifespan(MagicMock()):
-            mock_poller_cls.assert_called_once_with(
+            mock_runner_cls.assert_called_once_with(
                 projections=[_StubProjection],
                 upstream_application=_StubApplication,
             )
-            mock_poller.start.assert_called_once()
-            mock_poller.stop.assert_not_called()
+            mock_runner.start.assert_called_once()
+            mock_runner.stop.assert_not_called()
 
-        mock_poller.stop.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
-    async def test_multiple_apps_creates_multiple_pollers(
-        self,
-        mock_proj: MagicMock,
-        mock_apps: MagicMock,
-        mock_poller_cls: MagicMock,
-    ) -> None:
-        """Multiple applications -> one poller per application."""
-        mock_proj.return_value = [_StubProjection, _AnotherProjection]
-        mock_apps.return_value = [_StubApplication, _AnotherApplication]
-        mock_pollers = [MagicMock(), MagicMock()]
-        mock_poller_cls.side_effect = mock_pollers
-
-        async with projection_runner_lifespan(MagicMock()):
-            assert mock_poller_cls.call_count == 2
-            for poller in mock_pollers:
-                poller.start.assert_called_once()
-
-        for poller in mock_pollers:
-            poller.stop.assert_called_once()
+        mock_runner.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
-    async def test_each_poller_receives_all_projections(
+    async def test_multiple_apps_creates_multiple_runners(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
-        mock_poller_cls: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
     ) -> None:
-        """Each poller receives the complete list of projections."""
+        """Multiple applications -> one runner per application."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
-        mock_apps.return_value = [_StubApplication, _AnotherApplication]
-        mock_poller_cls.return_value = MagicMock()
+        mock_group.return_value = {
+            _StubApplication: [_StubProjection],
+            _AnotherApplication: [_AnotherProjection],
+        }
+        mock_runners = [MagicMock(), MagicMock()]
+        mock_runner_cls.side_effect = mock_runners
 
         async with projection_runner_lifespan(MagicMock()):
-            calls = mock_poller_cls.call_args_list
+            assert mock_runner_cls.call_count == 2
+            for runner in mock_runners:
+                runner.start.assert_called_once()
+
+        for runner in mock_runners:
+            runner.stop.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
+    async def test_projections_grouped_by_upstream_app(
+        self,
+        mock_proj: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
+        """Each runner receives only its application's projections."""
+        mock_proj.return_value = [_StubProjection, _AnotherProjection]
+        mock_group.return_value = {
+            _StubApplication: [_StubProjection],
+            _AnotherApplication: [_AnotherProjection],
+        }
+        mock_runner_cls.return_value = MagicMock()
+
+        async with projection_runner_lifespan(MagicMock()):
+            calls = mock_runner_cls.call_args_list
             assert calls[0] == (
                 (),
                 {
-                    "projections": [_StubProjection, _AnotherProjection],
+                    "projections": [_StubProjection],
                     "upstream_application": _StubApplication,
                 },
             )
             assert calls[1] == (
                 (),
                 {
-                    "projections": [_StubProjection, _AnotherProjection],
+                    "projections": [_AnotherProjection],
                     "upstream_application": _AnotherApplication,
                 },
             )
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_start_failure_propagates(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
-        mock_poller_cls: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
     ) -> None:
-        """If poller.start() raises, the exception propagates."""
+        """If runner.start() raises, the exception propagates."""
         mock_proj.return_value = [_StubProjection]
-        mock_apps.return_value = [_StubApplication]
-        mock_poller = MagicMock()
-        mock_poller.start.side_effect = RuntimeError("start failed")
-        mock_poller_cls.return_value = mock_poller
+        mock_group.return_value = {_StubApplication: [_StubProjection]}
+        mock_runner = MagicMock()
+        mock_runner.start.side_effect = RuntimeError("start failed")
+        mock_runner_cls.return_value = mock_runner
 
         with pytest.raises(RuntimeError, match="start failed"):
             async with projection_runner_lifespan(MagicMock()):
                 pass  # pragma: no cover
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_stop_called_on_exception_during_yield(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
-        mock_poller_cls: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
     ) -> None:
-        """Pollers are stopped even if an exception occurs during yield."""
+        """Runners are stopped even if an exception occurs during yield."""
         mock_proj.return_value = [_StubProjection]
-        mock_apps.return_value = [_StubApplication]
-        mock_poller = MagicMock()
-        mock_poller_cls.return_value = mock_poller
+        mock_group.return_value = {_StubApplication: [_StubProjection]}
+        mock_runner = MagicMock()
+        mock_runner_cls.return_value = mock_runner
 
         with pytest.raises(ValueError, match="app error"):
             async with projection_runner_lifespan(MagicMock()):
                 raise ValueError("app error")
 
-        mock_poller.stop.assert_called_once()
+        mock_runner.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("praecepta.infra.eventsourcing.projection_lifespan.ProjectionPoller")
-    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_applications")
+    @patch.dict("os.environ", {"MAX_PROJECTION_RUNNERS": "1"})
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
+    async def test_max_projection_runners_caps_projections(
+        self,
+        mock_proj: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
+        """When MAX_PROJECTION_RUNNERS=1, only one projection runner starts."""
+        mock_proj.return_value = [_StubProjection, _AnotherProjection]
+        mock_group.return_value = {
+            _StubApplication: [_StubProjection],
+            _AnotherApplication: [_AnotherProjection],
+        }
+        mock_runner = MagicMock()
+        mock_runner_cls.return_value = mock_runner
+
+        async with projection_runner_lifespan(MagicMock()):
+            # Only 1 runner should be created due to cap
+            assert mock_runner_cls.call_count == 1
+
+        mock_runner.stop.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
+    @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
     async def test_partial_start_failure_stops_already_started(
         self,
         mock_proj: MagicMock,
-        mock_apps: MagicMock,
-        mock_poller_cls: MagicMock,
+        mock_group: MagicMock,
+        mock_runner_cls: MagicMock,
     ) -> None:
-        """If second poller.start() fails, first poller is still stopped."""
-        mock_proj.return_value = [_StubProjection]
-        mock_apps.return_value = [_StubApplication, _AnotherApplication]
+        """If second runner.start() fails, first runner is still stopped."""
+        mock_proj.return_value = [_StubProjection, _AnotherProjection]
+        mock_group.return_value = {
+            _StubApplication: [_StubProjection],
+            _AnotherApplication: [_AnotherProjection],
+        }
 
-        poller_ok = MagicMock()
-        poller_fail = MagicMock()
-        poller_fail.start.side_effect = RuntimeError("db connection failed")
-        mock_poller_cls.side_effect = [poller_ok, poller_fail]
+        runner_ok = MagicMock()
+        runner_fail = MagicMock()
+        runner_fail.start.side_effect = RuntimeError("db connection failed")
+        mock_runner_cls.side_effect = [runner_ok, runner_fail]
 
         with pytest.raises(RuntimeError, match="db connection failed"):
             async with projection_runner_lifespan(MagicMock()):
                 pass  # pragma: no cover
 
-        poller_ok.stop.assert_called_once()
-        poller_fail.stop.assert_not_called()
+        runner_ok.stop.assert_called_once()
+        runner_fail.stop.assert_not_called()

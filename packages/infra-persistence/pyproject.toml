@@ -20,6 +20,9 @@ dependencies = [
 praecepta-foundation-domain = { workspace = true }
 praecepta-foundation-application = { workspace = true }
 
+[project.entry-points."praecepta.lifespan"]
+persistence = "praecepta.infra.persistence:lifespan_contribution"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

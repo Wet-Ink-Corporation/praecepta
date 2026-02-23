@@ -8,41 +8,50 @@ import pytest
 from taskiq import TaskiqScheduler
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
+from praecepta.infra.taskiq.broker import get_broker, get_result_backend, get_scheduler
 
-class TestBrokerInstantiation:
+
+class TestFactoryFunctions:
     @pytest.mark.unit
-    def test_broker_is_redis_stream_broker(self) -> None:
-        with patch.dict("os.environ", {"REDIS_URL": "redis://localhost:6379/0"}, clear=False):
-            from praecepta.infra.taskiq.broker import broker
-
-            assert isinstance(broker, RedisStreamBroker)
-
-    @pytest.mark.unit
-    def test_result_backend_is_redis(self) -> None:
-        from praecepta.infra.taskiq.broker import result_backend
-
-        assert isinstance(result_backend, RedisAsyncResultBackend)
-
-    @pytest.mark.unit
-    def test_scheduler_is_taskiq_scheduler(self) -> None:
-        from praecepta.infra.taskiq.broker import scheduler
-
-        assert isinstance(scheduler, TaskiqScheduler)
-
-    @pytest.mark.unit
-    def test_get_redis_url_uses_env(self) -> None:
-        with patch.dict(
-            "os.environ",
-            {"REDIS_URL": "redis://custom-host:6380/1"},
-            clear=False,
-        ):
-            from praecepta.infra.taskiq.broker import _get_redis_url
-
-            assert _get_redis_url() == "redis://custom-host:6380/1"
-
-    @pytest.mark.unit
-    def test_get_redis_url_default(self) -> None:
+    def test_get_broker_returns_redis_stream_broker(self) -> None:
+        get_broker.cache_clear()
+        get_result_backend.cache_clear()
         with patch.dict("os.environ", {}, clear=True):
-            from praecepta.infra.taskiq.broker import _get_redis_url
+            b = get_broker()
+            assert isinstance(b, RedisStreamBroker)
 
-            assert _get_redis_url() == "redis://localhost:6379/0"
+    @pytest.mark.unit
+    def test_get_result_backend_returns_redis(self) -> None:
+        get_result_backend.cache_clear()
+        with patch.dict("os.environ", {}, clear=True):
+            rb = get_result_backend()
+            assert isinstance(rb, RedisAsyncResultBackend)
+
+    @pytest.mark.unit
+    def test_get_scheduler_returns_taskiq_scheduler(self) -> None:
+        get_broker.cache_clear()
+        get_result_backend.cache_clear()
+        get_scheduler.cache_clear()
+        with patch.dict("os.environ", {}, clear=True):
+            s = get_scheduler()
+            assert isinstance(s, TaskiqScheduler)
+
+    @pytest.mark.unit
+    def test_get_broker_is_cached(self) -> None:
+        get_broker.cache_clear()
+        get_result_backend.cache_clear()
+        with patch.dict("os.environ", {}, clear=True):
+            b1 = get_broker()
+            b2 = get_broker()
+            assert b1 is b2
+
+    @pytest.mark.unit
+    def test_factory_not_invoked_at_import_time(self) -> None:
+        """Module-level broker/scheduler are lazy proxies, not eagerly created."""
+        from praecepta.infra.taskiq.broker import _LazyBroker, _LazyScheduler
+
+        lb = _LazyBroker()
+        ls = _LazyScheduler()
+        # _instance is None until first attribute access
+        assert lb._instance is None
+        assert ls._instance is None

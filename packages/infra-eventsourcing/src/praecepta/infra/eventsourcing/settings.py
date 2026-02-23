@@ -125,6 +125,14 @@ class EventSourcingSettings(BaseSettings):
         description="Table lock timeout in seconds (0 = no timeout)",
     )
 
+    # Projection runner limits
+    max_projection_runners: int = Field(
+        default=8,
+        ge=1,
+        le=32,
+        description="Maximum number of projection runners (caps discovered projections)",
+    )
+
     # Advanced options
     postgres_pre_ping: bool = Field(
         default=False,
@@ -205,8 +213,10 @@ class EventSourcingSettings(BaseSettings):
 class ProjectionPollingSettings(BaseSettings):
     """Configuration for projection polling behaviour.
 
-    Controls how the ``ProjectionPoller`` background thread polls the
-    PostgreSQL notification log for new events.
+    .. deprecated::
+        ``ProjectionPollingSettings`` is only used by the deprecated
+        ``ProjectionPoller``.  The recommended ``SubscriptionProjectionRunner``
+        uses LISTEN/NOTIFY subscriptions and does not require polling settings.
 
     Environment Variables:
         PROJECTION_POLL_INTERVAL: Seconds between poll cycles (default: 1.0)

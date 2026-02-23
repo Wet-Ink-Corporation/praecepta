@@ -352,9 +352,9 @@ class TestRequestValidationHandler:
 
 class TestUnhandledExceptionHandler:
     @pytest.mark.unit
-    def test_returns_500_production_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("DEBUG", raising=False)
-        app = _make_app()
+    def test_returns_500_production_mode(self) -> None:
+        app = FastAPI(debug=False)
+        register_exception_handlers(app)
 
         @app.get("/test")
         def endpoint() -> None:
@@ -370,17 +370,22 @@ class TestUnhandledExceptionHandler:
         assert "correlation_id" in body
 
     @pytest.mark.unit
-    def test_returns_500_debug_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("DEBUG", "true")
-        app = _make_app()
+    @pytest.mark.asyncio
+    async def test_returns_500_debug_mode(self) -> None:
+        from unittest.mock import MagicMock, PropertyMock
 
-        @app.get("/test")
-        def endpoint() -> None:
-            raise RuntimeError("kaboom")
+        from praecepta.infra.fastapi.error_handlers import unhandled_exception_handler
 
-        client = TestClient(app, raise_server_exceptions=False)
-        resp = client.get("/test")
+        # Create a mock request whose app.debug returns True
+        mock_request = MagicMock()
+        mock_request.url.path = "/test"
+        mock_request.method = "GET"
+        type(mock_request.app).debug = PropertyMock(return_value=True)
+
+        resp = await unhandled_exception_handler(mock_request, RuntimeError("kaboom"))
         assert resp.status_code == 500
-        body = resp.json()
+        import json
+
+        body = json.loads(resp.body)
         assert "RuntimeError" in body["detail"]
         assert "kaboom" in body["detail"]

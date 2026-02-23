@@ -17,9 +17,12 @@ TEST_EXCLUDE_NAMES = frozenset(
     {
         "api_key_auth",
         "jwt_auth",
+        "auth",
         "event_store",
+        "persistence",
         "projection_runner",
         "observability",
+        "taskiq",
     }
 )
 

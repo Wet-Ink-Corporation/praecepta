@@ -63,8 +63,9 @@ class JWKSProvider:
         self._issuer_url = issuer_url.rstrip("/")
         self._cache_ttl = cache_ttl
 
-        # Construct JWKS URI following standard OIDC pattern.
-        self._jwks_uri = f"{self._issuer_url}/.well-known/jwks.json"
+        # Try OIDC discovery to get the authoritative JWKS URI.
+        # Fall back to constructed URI if discovery fails (CF-19).
+        self._jwks_uri = self._discover_jwks_uri() or (f"{self._issuer_url}/.well-known/jwks.json")
 
         # Initialize PyJWKClient with caching enabled.
         # PyJWKClient handles kid mismatch -> refresh -> retry internally.
@@ -82,6 +83,55 @@ class JWKSProvider:
                 "cache_ttl": cache_ttl,
             },
         )
+
+    def _discover_jwks_uri(self) -> str | None:
+        """Attempt OIDC discovery to resolve jwks_uri.
+
+        Fetches the OpenID Connect discovery document from
+        ``{issuer}/.well-known/openid-configuration`` and extracts ``jwks_uri``.
+        Validates that the discovered issuer matches the configured issuer.
+
+        Returns:
+            Discovered JWKS URI, or ``None`` if discovery fails.
+        """
+        import httpx
+
+        discovery_url = f"{self._issuer_url}/.well-known/openid-configuration"
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(discovery_url)
+                resp.raise_for_status()
+                doc = resp.json()
+
+            # Validate issuer match
+            discovered_issuer = doc.get("issuer", "").rstrip("/")
+            if discovered_issuer != self._issuer_url:
+                logger.warning(
+                    "oidc_discovery_issuer_mismatch",
+                    extra={
+                        "expected": self._issuer_url,
+                        "discovered": discovered_issuer,
+                    },
+                )
+                return None
+
+            jwks_uri = doc.get("jwks_uri")
+            if jwks_uri:
+                logger.info(
+                    "oidc_discovery_success",
+                    extra={"jwks_uri": jwks_uri},
+                )
+                return str(jwks_uri)
+
+            logger.warning("oidc_discovery_no_jwks_uri")
+            return None
+        except Exception:
+            logger.debug(
+                "oidc_discovery_failed",
+                extra={"url": discovery_url},
+                exc_info=True,
+            )
+            return None
 
     def get_signing_key_from_jwt(self, token: str) -> PyJWK:
         """Retrieve the signing key for a JWT token.

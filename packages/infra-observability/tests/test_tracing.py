@@ -67,6 +67,69 @@ class TestTracingSettings:
             assert settings.exporter_type == "console"
 
 
+class TestTracingSampleRate:
+    @pytest.mark.unit
+    def test_default_sample_rate(self) -> None:
+        settings = TracingSettings()
+        assert settings.sample_rate == 1.0
+
+    @pytest.mark.unit
+    def test_custom_sample_rate(self) -> None:
+        settings = TracingSettings(sample_rate=0.5)
+        assert settings.sample_rate == 0.5
+
+    @pytest.mark.unit
+    def test_sample_rate_from_env(self) -> None:
+        with patch.dict("os.environ", {"OTEL_TRACE_SAMPLE_RATE": "0.25"}, clear=True):
+            settings = TracingSettings()
+            assert settings.sample_rate == 0.25
+
+    @pytest.mark.unit
+    def test_sample_rate_bounds(self) -> None:
+        with pytest.raises(Exception):  # noqa: B017
+            TracingSettings(sample_rate=-0.1)
+        with pytest.raises(Exception):  # noqa: B017
+            TracingSettings(sample_rate=1.5)
+
+    @pytest.mark.unit
+    def test_sampler_passed_to_provider(self) -> None:
+        import sys
+        from types import ModuleType
+        from unittest.mock import MagicMock
+
+        from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
+
+        from praecepta.infra.observability.tracing import configure_tracing
+
+        settings = TracingSettings(exporter_type="console", sample_rate=0.42)
+        app = MagicMock()
+
+        # Stub the optional instrumentation module so the import inside
+        # configure_tracing succeeds even when the package is not installed.
+        fake_mod = ModuleType("opentelemetry.instrumentation.fastapi")
+        fake_mod.FastAPIInstrumentor = MagicMock()  # type: ignore[attr-defined]
+        sys.modules["opentelemetry.instrumentation"] = ModuleType("opentelemetry.instrumentation")
+        sys.modules["opentelemetry.instrumentation.fastapi"] = fake_mod
+
+        try:
+            with (
+                patch("praecepta.infra.observability.tracing.TracerProvider") as mock_provider_cls,
+                patch("praecepta.infra.observability.tracing.trace"),
+            ):
+                mock_provider = MagicMock()
+                mock_provider_cls.return_value = mock_provider
+
+                configure_tracing(app, settings=settings)
+
+                # Verify TracerProvider was called with a TraceIdRatioBased sampler
+                call_kwargs = mock_provider_cls.call_args
+                sampler = call_kwargs.kwargs.get("sampler") or call_kwargs[1].get("sampler")
+                assert isinstance(sampler, TraceIdRatioBased)
+        finally:
+            sys.modules.pop("opentelemetry.instrumentation.fastapi", None)
+            sys.modules.pop("opentelemetry.instrumentation", None)
+
+
 class TestShutdownTracing:
     @pytest.mark.unit
     def test_shutdown_idempotent(self) -> None:

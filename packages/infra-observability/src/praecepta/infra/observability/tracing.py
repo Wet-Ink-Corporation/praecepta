@@ -22,6 +22,8 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -29,6 +31,8 @@ from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
     SpanExporter,
 )
+from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -103,6 +107,13 @@ class TracingSettings(BaseSettings):
         default="http://localhost:14268/api/traces",
         alias="OTEL_EXPORTER_JAEGER_ENDPOINT",
         description="Jaeger collector HTTP endpoint",
+    )
+    sample_rate: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        alias="OTEL_TRACE_SAMPLE_RATE",
+        description="Trace sampling rate (0.0 = none, 1.0 = all)",
     )
 
     @field_validator("exporter_type", mode="before")
@@ -272,8 +283,9 @@ def configure_tracing(app: FastAPI, settings: TracingSettings | None = None) -> 
         }
     )
 
-    # Create and configure TracerProvider
-    provider = TracerProvider(resource=resource)
+    # Create and configure TracerProvider with sampling
+    sampler = TraceIdRatioBased(settings.sample_rate)
+    provider = TracerProvider(resource=resource, sampler=sampler)
 
     # Create exporter and processor
     exporter = _create_exporter(settings)
@@ -282,6 +294,9 @@ def configure_tracing(app: FastAPI, settings: TracingSettings | None = None) -> 
 
     # Set global tracer provider
     trace.set_tracer_provider(provider)
+
+    # Set explicit W3C TraceContext propagator (CF-40)
+    set_global_textmap(CompositePropagator([TraceContextTextMapPropagator()]))
 
     # Store reference for shutdown
     _tracer_provider = provider

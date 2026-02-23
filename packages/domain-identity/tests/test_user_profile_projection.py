@@ -52,6 +52,14 @@ def _make_preferences_updated_event(
 
 
 @pytest.mark.unit
+class TestUserProfileProjectionUpstream:
+    def test_declares_upstream_application(self) -> None:
+        from praecepta.domain.identity.user_app import UserApplication
+
+        assert UserProfileProjection.upstream_application is UserApplication
+
+
+@pytest.mark.unit
 class TestUserProfileProjectionTopics:
     def test_subscribes_to_user_events(self) -> None:
         assert len(UserProfileProjection.topics) == 3

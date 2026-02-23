@@ -137,3 +137,37 @@ class TestOIDCTokenClient:
 
         # Revocation is best-effort; should not raise
         await client.revoke_token("some_refresh_token")
+
+    @pytest.mark.asyncio
+    async def test_shared_client_reused_across_calls(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Two calls should reuse the same internal httpx.AsyncClient."""
+        shared = httpx.AsyncClient()
+        oidc = OIDCTokenClient(
+            base_url="https://auth.example.com",
+            client_id="cid",
+            client_secret="csec",
+            client=shared,
+        )
+        # Internal client should be the one we passed
+        assert oidc._get_client() is shared
+
+        # aclose should NOT close an externally-provided client
+        await oidc.aclose()
+        assert oidc._client is shared
+        await shared.aclose()
+
+    @pytest.mark.asyncio
+    async def test_lazy_client_created_on_first_use(self) -> None:
+        """Without explicit client, one is created lazily."""
+        oidc = OIDCTokenClient(
+            base_url="https://auth.example.com",
+            client_id="cid",
+            client_secret="csec",
+        )
+        assert oidc._client is None
+        client = oidc._get_client()
+        assert client is not None
+        # Same instance returned on second call
+        assert oidc._get_client() is client
+        await oidc.aclose()
+        assert oidc._client is None

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 
@@ -11,9 +13,22 @@ class TestAutoDiscovery:
 
     def test_health_endpoint_discovered(self, client) -> None:
         """Auto-discovered _health_stub router serves /healthz."""
-        resp = client.get("/healthz")
+        with (
+            patch(
+                "praecepta.infra.fastapi._health._check_database",
+                new_callable=AsyncMock,
+                return_value={"status": "ok"},
+            ),
+            patch(
+                "praecepta.infra.fastapi._health._check_redis",
+                new_callable=AsyncMock,
+                return_value={"status": "ok"},
+            ),
+        ):
+            resp = client.get("/healthz")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        body = resp.json()
+        assert body["status"] == "ok"
 
     def test_dog_router_mounted(self, client, tenant_headers) -> None:
         """extra_routers works alongside auto-discovered routers."""

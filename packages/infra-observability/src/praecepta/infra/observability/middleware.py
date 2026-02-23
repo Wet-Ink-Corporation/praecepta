@@ -1,7 +1,7 @@
 """Tracing middleware for trace-log correlation.
 
-This module provides middleware to bind OpenTelemetry trace context to
-structlog for automatic trace ID and span ID inclusion in all logs.
+This module provides pure ASGI middleware to bind OpenTelemetry trace context
+to structlog for automatic trace ID and span ID inclusion in all logs.
 
 Usage:
     # Add to FastAPI middleware stack
@@ -11,23 +11,19 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from opentelemetry import trace
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from praecepta.foundation.application.contributions import MiddlewareContribution
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
-    from starlette.requests import Request
-    from starlette.responses import Response
+    from collections.abc import Callable
 
 
-class TraceContextMiddleware(BaseHTTPMiddleware):
-    """Middleware to bind trace_id and span_id to structlog context.
+class TraceContextMiddleware:
+    """Pure ASGI middleware to bind trace_id and span_id to structlog context.
 
     Extracts trace context from the active OpenTelemetry span (created by
     FastAPIInstrumentor) and binds trace_id and span_id to structlog
@@ -48,23 +44,19 @@ class TraceContextMiddleware(BaseHTTPMiddleware):
         >>> app.add_middleware(TraceContextMiddleware)
     """
 
-    async def dispatch(
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(
         self,
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        """Process request with trace context binding.
+        scope: dict[str, Any],
+        receive: Callable[..., Any],
+        send: Callable[..., Any],
+    ) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
 
-        Extracts trace_id and span_id from the active span and binds them
-        to structlog context for correlation with logs.
-
-        Args:
-            request: Incoming HTTP request.
-            call_next: Next middleware or route handler.
-
-        Returns:
-            Response from downstream handlers.
-        """
         # Get current span from OpenTelemetry context
         span = trace.get_current_span()
 
@@ -81,9 +73,18 @@ class TraceContextMiddleware(BaseHTTPMiddleware):
                 span_id=span_id,
             )
 
+        # Defensively bind request_id if available (CF-25)
         try:
-            response = await call_next(request)
-            return response
+            from praecepta.infra.fastapi.middleware.request_id import get_request_id
+
+            rid = get_request_id()
+            if rid:
+                structlog.contextvars.bind_contextvars(request_id=rid)
+        except ImportError:
+            pass
+
+        try:
+            await self.app(scope, receive, send)
         finally:
             # Always unbind trace context to prevent leakage between requests
             structlog.contextvars.unbind_contextvars("trace_id", "span_id")
@@ -92,5 +93,5 @@ class TraceContextMiddleware(BaseHTTPMiddleware):
 # Module-level contribution for auto-discovery via entry points
 contribution = MiddlewareContribution(
     middleware_class=TraceContextMiddleware,
-    priority=20,  # Outermost band (0-99)
+    priority=5,  # Outermost, before RequestIdMiddleware (10) to capture full request span
 )

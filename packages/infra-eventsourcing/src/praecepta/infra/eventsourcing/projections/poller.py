@@ -86,6 +86,13 @@ class ProjectionPoller:
     ) -> None:
         """Initialise the projection poller.
 
+        .. deprecated::
+            ``ProjectionPoller`` uses ``SingleThreadedRunner`` which creates
+            N+1 application instances with separate connection pools and uses
+            polling instead of LISTEN/NOTIFY subscriptions.
+            Use :class:`~praecepta.infra.eventsourcing.projections.subscription_runner.SubscriptionProjectionRunner`
+            instead.
+
         Args:
             projections: List of ``BaseProjection`` subclasses to run.
                 Each projection will consume events from the upstream
@@ -96,6 +103,16 @@ class ProjectionPoller:
             env: Optional environment variables for eventsourcing
                 infrastructure configuration.
         """
+        import warnings
+
+        warnings.warn(
+            "ProjectionPoller uses SingleThreadedRunner which creates N+1 application "
+            "instances with separate connection pools. Use SubscriptionProjectionRunner "
+            "instead, which uses the library's EventSourcedProjectionRunner with "
+            "LISTEN/NOTIFY subscriptions.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._projections = projections
         self._upstream_application = upstream_application
         self._env = env or {}

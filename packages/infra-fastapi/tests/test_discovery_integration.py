@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -22,9 +24,22 @@ class TestDiscoveryIntegration:
         """create_app() without router exclusion discovers and mounts /healthz."""
         app = create_app(settings=AppSettings(title="Discovery Test"))
         client = TestClient(app)
-        response = client.get("/healthz")
+        with (
+            patch(
+                "praecepta.infra.fastapi._health._check_database",
+                new_callable=AsyncMock,
+                return_value={"status": "ok"},
+            ),
+            patch(
+                "praecepta.infra.fastapi._health._check_redis",
+                new_callable=AsyncMock,
+                return_value={"status": "ok"},
+            ),
+        ):
+            response = client.get("/healthz")
         assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        body = response.json()
+        assert body["status"] == "ok"
 
     @pytest.mark.unit
     def test_exclude_routers_group_hides_health(self) -> None:

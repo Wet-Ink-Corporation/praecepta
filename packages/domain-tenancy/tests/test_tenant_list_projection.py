@@ -35,6 +35,16 @@ def _make_event(
 
 
 @pytest.mark.unit
+class TestTenantListProjectionUpstream:
+    """Upstream application declaration."""
+
+    def test_declares_upstream_application(self) -> None:
+        from praecepta.domain.tenancy.tenant_app import TenantApplication
+
+        assert TenantListProjection.upstream_application is TenantApplication
+
+
+@pytest.mark.unit
 class TestTenantListProjectionTopics:
     """Topic configuration."""
 

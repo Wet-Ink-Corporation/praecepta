@@ -1,4 +1,4 @@
-"""Tests for ProjectionPoller polling-based projection runner."""
+"""Tests for ProjectionPoller polling-based projection runner (deprecated)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,9 @@ import pytest
 
 from praecepta.infra.eventsourcing.projections.poller import ProjectionPoller
 from praecepta.infra.eventsourcing.settings import ProjectionPollingSettings
+
+# All tests in this module suppress the deprecation warning from ProjectionPoller
+pytestmark = [pytest.mark.filterwarnings("ignore::DeprecationWarning")]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,6 +71,17 @@ class TestProjectionPollingSettings:
 # ---------------------------------------------------------------------------
 # Tests: ProjectionPoller lifecycle
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestProjectionPollerDeprecation:
+    def test_emits_deprecation_warning(self) -> None:
+        with pytest.warns(DeprecationWarning, match="SubscriptionProjectionRunner"):
+            ProjectionPoller(
+                projections=[],
+                upstream_application=MagicMock,
+                settings=_make_settings(),
+            )
 
 
 @pytest.mark.unit

@@ -7,10 +7,8 @@ request lifecycle.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
-
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from praecepta.foundation.application import MiddlewareContribution
 from praecepta.foundation.application.context import (
@@ -19,10 +17,7 @@ from praecepta.foundation.application.context import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
-    from starlette.requests import Request
-    from starlette.responses import Response
+    from collections.abc import Callable
 
 
 # Header names
@@ -31,8 +26,16 @@ USER_ID_HEADER = "X-User-ID"
 CORRELATION_ID_HEADER = "X-Correlation-ID"
 
 
-class RequestContextMiddleware(BaseHTTPMiddleware):
-    """Middleware that populates request context from HTTP headers.
+def _extract_header(headers: list[tuple[bytes, bytes]], name: bytes) -> str:
+    """Extract a header value from raw ASGI headers."""
+    for key, value in headers:
+        if key.lower() == name:
+            return value.decode("latin-1")
+    return ""
+
+
+class RequestContextMiddleware:
+    """Pure ASGI middleware that populates request context from HTTP headers.
 
     Extracts the following headers and makes them available via the
     request context module:
@@ -43,24 +46,24 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
     The context is automatically cleared after the request completes.
     """
 
-    async def dispatch(
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(
         self,
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        """Process the request and populate context.
+        scope: dict[str, Any],
+        receive: Callable[..., Any],
+        send: Callable[..., Any],
+    ) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
 
-        Args:
-            request: The incoming HTTP request.
-            call_next: The next middleware/handler in the chain.
-
-        Returns:
-            The HTTP response.
-        """
-        # Extract headers (endpoints validate required headers separately)
-        tenant_id = request.headers.get(TENANT_ID_HEADER, "")
-        user_id_str = request.headers.get(USER_ID_HEADER, "")
-        correlation_id = request.headers.get(CORRELATION_ID_HEADER) or str(uuid4())
+        # Extract headers
+        headers = scope.get("headers", [])
+        tenant_id = _extract_header(headers, b"x-tenant-id")
+        user_id_str = _extract_header(headers, b"x-user-id")
+        correlation_id = _extract_header(headers, b"x-correlation-id") or str(uuid4())
 
         # Parse user ID, default to nil UUID if not provided
         try:
@@ -75,13 +78,17 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             correlation_id=correlation_id,
         )
 
+        # Wrap send to inject correlation ID response header
+        async def send_with_correlation_id(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                resp_headers = list(message.get("headers", []))
+                resp_headers.append((b"x-correlation-id", correlation_id.encode("latin-1")))
+                message = {**message, "headers": resp_headers}
+            await send(message)
+
         try:
-            # Add correlation ID to response headers for tracing
-            response = await call_next(request)
-            response.headers[CORRELATION_ID_HEADER] = correlation_id
-            return response
+            await self.app(scope, receive, send_with_correlation_id)
         finally:
-            # Always clear context after request
             clear_request_context(token)
 
 

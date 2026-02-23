@@ -8,8 +8,9 @@ projection table via UPSERT pattern.
 from __future__ import annotations
 
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from praecepta.domain.identity.user_app import UserApplication
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 
     from eventsourcing.application import ProcessingEvent
     from eventsourcing.domain import DomainEvent
+    from eventsourcing.utils import EnvType
 
     from praecepta.domain.identity.infrastructure.user_profile_repository import (
         UserProfileRepository,
@@ -31,14 +33,27 @@ class UserProfileProjection(BaseProjection):
     Pattern: UPSERT into user_profile (idempotent for replay).
     """
 
+    upstream_application: ClassVar[type[Any]] = UserApplication  # type: ignore[assignment]
+
     topics: ClassVar[tuple[str, ...]] = (  # type: ignore[misc]
         "praecepta.domain.identity.user:User.Provisioned",
         "praecepta.domain.identity.user:User.ProfileUpdated",
         "praecepta.domain.identity.user:User.PreferencesUpdated",
     )
 
-    def __init__(self, repository: UserProfileRepository) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        repository: UserProfileRepository | None = None,
+        env: EnvType | None = None,
+    ) -> None:
+        super().__init__(env=env)
+        if repository is None:
+            from praecepta.domain.identity.infrastructure.user_profile_repository import (
+                UserProfileRepository as _UserProfileRepository,
+            )
+            from praecepta.infra.persistence.database import get_sync_session_factory
+
+            repository = _UserProfileRepository(session_factory=get_sync_session_factory())
         self._repo = repository
 
     @singledispatchmethod

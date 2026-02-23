@@ -13,6 +13,7 @@ from praecepta.infra.auth.dependencies import (
 )
 from praecepta.infra.auth.dev_bypass import resolve_dev_bypass
 from praecepta.infra.auth.jwks import JWKSProvider
+from praecepta.infra.auth.lifespan import lifespan_contribution
 from praecepta.infra.auth.middleware.api_key_auth import APIKeyAuthMiddleware
 from praecepta.infra.auth.middleware.jwt_auth import JWTAuthMiddleware
 from praecepta.infra.auth.oidc_client import (
@@ -51,6 +52,7 @@ __all__ = [
     "derive_code_challenge",
     "get_auth_settings",
     "get_current_principal",
+    "lifespan_contribution",
     "require_role",
     "resolve_dev_bypass",
 ]

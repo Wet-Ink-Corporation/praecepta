@@ -29,13 +29,35 @@ class TestCORSSettings:
         cors = CORSSettings(allow_origins=["http://a.com"])  # type: ignore[call-arg]
         assert cors.allow_origins == ["http://a.com"]
 
+    @pytest.mark.unit
+    def test_credentials_with_wildcard_raises(self) -> None:
+        with pytest.raises(Exception, match="allow_credentials"):
+            CORSSettings(allow_credentials=True, allow_origins=["*"])  # type: ignore[call-arg]
+
+    @pytest.mark.unit
+    def test_credentials_with_explicit_origins_ok(self) -> None:
+        cors = CORSSettings(
+            allow_credentials=True,  # type: ignore[call-arg]
+            allow_origins=["http://a.com"],  # type: ignore[call-arg]
+        )
+        assert cors.allow_credentials is True
+        assert cors.allow_origins == ["http://a.com"]
+
+    @pytest.mark.unit
+    def test_wildcard_without_credentials_ok(self) -> None:
+        cors = CORSSettings(allow_origins=["*"])  # type: ignore[call-arg]
+        assert cors.allow_credentials is False
+        assert cors.allow_origins == ["*"]
+
 
 class TestAppSettings:
     @pytest.mark.unit
     def test_defaults(self) -> None:
         settings = AppSettings()
         assert settings.title == "Praecepta Application"
-        assert settings.version == "0.1.0"
+        # Version comes from package metadata (or 0.0.0 fallback)
+        assert isinstance(settings.version, str)
+        assert settings.version != ""
         assert settings.description == ""
         assert settings.docs_url == "/docs"
         assert settings.debug is False

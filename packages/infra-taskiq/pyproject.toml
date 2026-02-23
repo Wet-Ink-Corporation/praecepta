@@ -8,9 +8,17 @@ authors = [
     { name = "Wet Ink", email = "dev@wetink.ai" }
 ]
 dependencies = [
+    "praecepta-foundation-application",
     "taskiq>=0.11",
     "taskiq-redis>=1.2",
+    "pydantic-settings>=2.0",
 ]
+
+[tool.uv.sources]
+praecepta-foundation-application = { workspace = true }
+
+[project.entry-points."praecepta.lifespan"]
+taskiq = "praecepta.infra.taskiq:lifespan_contribution"
 
 [build-system]
 requires = ["hatchling"]

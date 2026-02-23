@@ -16,6 +16,13 @@ from praecepta.foundation.application.context import (
     set_request_context,
 )
 from praecepta.foundation.application.contributions import (
+    LIFESPAN_PRIORITY_EVENTSTORE,
+    LIFESPAN_PRIORITY_OBSERVABILITY,
+    LIFESPAN_PRIORITY_PERSISTENCE,
+    LIFESPAN_PRIORITY_PROJECTIONS,
+    LIFESPAN_PRIORITY_TASKIQ,
+    MIDDLEWARE_PRIORITY_MAX,
+    MIDDLEWARE_PRIORITY_MIN,
     ErrorHandlerContribution,
     LifespanContribution,
     MiddlewareContribution,
@@ -43,6 +50,13 @@ from praecepta.foundation.application.rotate_api_key import (
 )
 
 __all__ = [
+    "LIFESPAN_PRIORITY_EVENTSTORE",
+    "LIFESPAN_PRIORITY_OBSERVABILITY",
+    "LIFESPAN_PRIORITY_PERSISTENCE",
+    "LIFESPAN_PRIORITY_PROJECTIONS",
+    "LIFESPAN_PRIORITY_TASKIQ",
+    "MIDDLEWARE_PRIORITY_MAX",
+    "MIDDLEWARE_PRIORITY_MIN",
     "DiscoveredContribution",
     "ErrorHandlerContribution",
     "IssueAPIKeyCommand",

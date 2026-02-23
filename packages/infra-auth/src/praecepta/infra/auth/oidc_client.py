@@ -65,14 +65,17 @@ class TokenExchangeError(Exception):
 class OIDCTokenClient:
     """Async HTTP client for OIDC / OAuth 2.0 token endpoints.
 
-    Lifecycle: Created per-request via FastAPI Depends. Each method
-    creates a short-lived httpx.AsyncClient via context manager.
+    Supports both per-request and shared httpx.AsyncClient modes:
+    - If ``client`` is provided, it is reused across calls (caller manages lifecycle).
+    - If ``client`` is omitted, an internal client is created lazily on first use.
+      Call :meth:`aclose` to release the internal client when done.
 
     Args:
         base_url: Identity provider base URL (e.g., "https://auth.example.com").
         client_id: OAuth application client_id.
         client_secret: OAuth application client_secret.
         timeout: HTTP request timeout in seconds.
+        client: Optional shared httpx.AsyncClient instance.
     """
 
     def __init__(
@@ -81,11 +84,14 @@ class OIDCTokenClient:
         client_id: str,
         client_secret: str,
         timeout: float = _DEFAULT_TIMEOUT,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._client_id = client_id
         self._client_secret = client_secret
         self._timeout = timeout
+        self._external_client = client is not None
+        self._client: httpx.AsyncClient | None = client
 
     async def exchange_code(
         self,
@@ -146,29 +152,44 @@ class OIDCTokenClient:
         Args:
             token: Refresh token to revoke.
         """
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self._base_url}/oauth2/revoke",
-                    data={
-                        "token": token,
-                        "token_type_hint": "refresh_token",
-                        "client_id": self._client_id,
-                        "client_secret": self._client_secret,
-                    },
-                    headers={"Content-Type": _FORM_CONTENT_TYPE},
-                    timeout=self._timeout,
-                )
-                response.raise_for_status()
-            except httpx.HTTPStatusError as exc:
-                logger.error(
-                    "oidc_revoke_failed",
-                    extra={"status": exc.response.status_code},
-                )
-                # Do not raise -- revocation failure should not block logout
-            except httpx.ConnectError:
-                logger.error("oidc_revoke_connection_error")
-                # Do not raise -- best-effort revocation
+        client = self._get_client()
+        try:
+            response = await client.post(
+                f"{self._base_url}/oauth2/revoke",
+                data={
+                    "token": token,
+                    "token_type_hint": "refresh_token",
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                },
+                headers={"Content-Type": _FORM_CONTENT_TYPE},
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "oidc_revoke_failed",
+                extra={"status": exc.response.status_code},
+            )
+            # Do not raise -- revocation failure should not block logout
+        except httpx.ConnectError:
+            logger.error("oidc_revoke_connection_error")
+            # Do not raise -- best-effort revocation
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Return the shared or lazily-created httpx.AsyncClient."""
+        if self._client is None:
+            self._client = httpx.AsyncClient()
+        return self._client
+
+    async def aclose(self) -> None:
+        """Close the internal httpx.AsyncClient if we own it.
+
+        No-op if the client was provided externally or not yet created.
+        """
+        if self._client is not None and not self._external_client:
+            await self._client.aclose()
+            self._client = None
 
     async def _token_request(self, data: dict[str, str]) -> TokenResponse:
         """Send POST to /oauth2/token endpoint.
@@ -182,26 +203,26 @@ class OIDCTokenClient:
         Raises:
             TokenExchangeError: On non-200 responses.
         """
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self._base_url}/oauth2/token",
-                    data=data,
-                    headers={"Content-Type": _FORM_CONTENT_TYPE},
-                    timeout=self._timeout,
-                )
-                response.raise_for_status()
-            except httpx.HTTPStatusError as exc:
-                content_type = exc.response.headers.get("content-type", "")
-                if content_type.startswith("application/json"):
-                    body: dict[str, str] = exc.response.json()
-                else:
-                    body = {}
-                raise TokenExchangeError(
-                    status_code=exc.response.status_code,
-                    error=body.get("error", "unknown"),
-                    error_description=body.get("error_description", str(exc)),
-                ) from exc
+        client = self._get_client()
+        try:
+            response = await client.post(
+                f"{self._base_url}/oauth2/token",
+                data=data,
+                headers={"Content-Type": _FORM_CONTENT_TYPE},
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            content_type = exc.response.headers.get("content-type", "")
+            if content_type.startswith("application/json"):
+                body: dict[str, str] = exc.response.json()
+            else:
+                body = {}
+            raise TokenExchangeError(
+                status_code=exc.response.status_code,
+                error=body.get("error", "unknown"),
+                error_description=body.get("error_description", str(exc)),
+            ) from exc
 
         body_json: dict[str, object] = response.json()
         raw_expires_in = body_json.get("expires_in")

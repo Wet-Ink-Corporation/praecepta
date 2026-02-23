@@ -44,8 +44,16 @@ def compose_lifespan(
                     hook_contrib.priority,
                     hook_contrib.hook,
                 )
-                ctx = hook_contrib.hook(app)
-                await stack.enter_async_context(ctx)
+                try:
+                    ctx = hook_contrib.hook(app)
+                    await stack.enter_async_context(ctx)
+                except Exception:
+                    logger.exception(
+                        "Lifespan hook failed (priority=%d): %r",
+                        hook_contrib.priority,
+                        hook_contrib.hook,
+                    )
+                    raise
             yield
 
     return lifespan

@@ -22,7 +22,7 @@ class TestContribution:
 
     @pytest.mark.unit
     def test_contribution_priority(self) -> None:
-        assert contribution.priority == 20
+        assert contribution.priority == 5
 
 
 class TestTraceContextMiddleware:

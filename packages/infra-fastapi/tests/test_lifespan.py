@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
@@ -68,3 +69,21 @@ class TestComposeLifespan:
         mock_app = MagicMock()
         async with lifespan(mock_app):  # type: ignore[arg-type]
             assert received_apps == [mock_app]
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hook_failure_logs_and_reraises(self, caplog: pytest.LogCaptureFixture) -> None:
+        @asynccontextmanager
+        async def bad_hook(app: object) -> AsyncIterator[None]:
+            raise RuntimeError("hook exploded")
+            yield  # pragma: no cover
+
+        hooks = [LifespanContribution(hook=bad_hook, priority=100)]
+        lifespan = compose_lifespan(hooks)
+        mock_app = MagicMock()
+
+        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError, match="hook exploded"):
+            async with lifespan(mock_app):  # type: ignore[arg-type]
+                pass
+
+        assert "Lifespan hook failed" in caplog.text

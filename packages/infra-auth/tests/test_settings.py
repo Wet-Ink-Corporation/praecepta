@@ -78,6 +78,38 @@ class TestAuthSettings:
         settings = AuthSettings(_env_file=None)  # type: ignore[call-arg]
         settings.validate_oauth_config()  # Should not raise
 
+    def test_issuer_https_required_when_not_bypass(self) -> None:
+        with pytest.raises(Exception, match="HTTPS"):
+            AuthSettings(
+                _env_file=None,  # type: ignore[call-arg]
+                issuer="http://insecure.example.com",
+                dev_bypass=False,
+            )
+
+    def test_issuer_http_allowed_when_bypass(self) -> None:
+        settings = AuthSettings(
+            _env_file=None,  # type: ignore[call-arg]
+            issuer="http://localhost:8080",
+            dev_bypass=True,
+        )
+        assert settings.issuer == "http://localhost:8080"
+
+    def test_issuer_https_passes_validation(self) -> None:
+        settings = AuthSettings(
+            _env_file=None,  # type: ignore[call-arg]
+            issuer="https://auth.example.com",
+            dev_bypass=False,
+        )
+        assert settings.issuer == "https://auth.example.com"
+
+    def test_issuer_empty_allowed(self) -> None:
+        settings = AuthSettings(
+            _env_file=None,  # type: ignore[call-arg]
+            issuer="",
+            dev_bypass=False,
+        )
+        assert settings.issuer == ""
+
     def test_get_auth_settings_caching(self) -> None:
         get_auth_settings.cache_clear()
         s1 = get_auth_settings()

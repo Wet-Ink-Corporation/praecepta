@@ -7,8 +7,9 @@ tenant_configuration projection table via UPSERT pattern.
 from __future__ import annotations
 
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from praecepta.domain.tenancy.tenant_app import TenantApplication
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
     from eventsourcing.application import ProcessingEvent
     from eventsourcing.domain import DomainEvent
+    from eventsourcing.utils import EnvType
 
     from praecepta.domain.tenancy.infrastructure.config_repository import (
         ConfigRepository,
@@ -35,16 +37,26 @@ class TenantConfigProjection(BaseProjection):
     via the @event decorator, and mypy cannot resolve them.
     """
 
+    upstream_application: ClassVar[type[Any]] = TenantApplication  # type: ignore[assignment]
+
     topics: ClassVar[tuple[str, ...]] = (  # type: ignore[misc]
         "praecepta.domain.tenancy.tenant:Tenant.ConfigUpdated",
     )
 
     def __init__(
         self,
-        repository: ConfigRepository,
+        repository: ConfigRepository | None = None,
         cache: ConfigCache | None = None,
+        env: EnvType | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(env=env)
+        if repository is None:
+            from praecepta.domain.tenancy.infrastructure.config_repository import (
+                ConfigRepository as _ConfigRepository,
+            )
+            from praecepta.infra.persistence.database import get_sync_session_factory
+
+            repository = _ConfigRepository(session_factory=get_sync_session_factory())
         self._repo = repository
         self._cache = cache
 

@@ -24,6 +24,9 @@ praecepta-foundation-application = { workspace = true }
 api_key_auth = "praecepta.infra.auth.middleware.api_key_auth:contribution"
 jwt_auth = "praecepta.infra.auth.middleware.jwt_auth:contribution"
 
+[project.entry-points."praecepta.lifespan"]
+auth = "praecepta.infra.auth.lifespan:lifespan_contribution"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

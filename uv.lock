@@ -1869,12 +1869,16 @@ name = "praecepta-infra-taskiq"
 version = "0.3.0"
 source = { editable = "packages/infra-taskiq" }
 dependencies = [
+    { name = "praecepta-foundation-application" },
+    { name = "pydantic-settings" },
     { name = "taskiq" },
     { name = "taskiq-redis" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "praecepta-foundation-application", editable = "packages/foundation-application" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "taskiq", specifier = ">=0.11" },
     { name = "taskiq-redis", specifier = ">=1.2" },
 ]

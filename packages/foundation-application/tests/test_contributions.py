@@ -5,6 +5,11 @@ from __future__ import annotations
 import pytest
 
 from praecepta.foundation.application.contributions import (
+    LIFESPAN_PRIORITY_EVENTSTORE,
+    LIFESPAN_PRIORITY_OBSERVABILITY,
+    LIFESPAN_PRIORITY_PERSISTENCE,
+    LIFESPAN_PRIORITY_PROJECTIONS,
+    LIFESPAN_PRIORITY_TASKIQ,
     ErrorHandlerContribution,
     LifespanContribution,
     MiddlewareContribution,
@@ -13,9 +18,9 @@ from praecepta.foundation.application.contributions import (
 
 class TestMiddlewareContribution:
     @pytest.mark.unit
-    def test_default_priority_is_500(self) -> None:
+    def test_default_priority_is_400(self) -> None:
         mc = MiddlewareContribution(middleware_class=type)
-        assert mc.priority == 500
+        assert mc.priority == 400
 
     @pytest.mark.unit
     def test_kwargs_defaults_to_empty_dict(self) -> None:
@@ -37,6 +42,23 @@ class TestMiddlewareContribution:
         mc = MiddlewareContribution(middleware_class=type)
         with pytest.raises(AttributeError):
             mc.priority = 10  # type: ignore[misc]
+
+    @pytest.mark.unit
+    def test_priority_below_min_raises(self) -> None:
+        with pytest.raises(ValueError, match="priority must be between"):
+            MiddlewareContribution(middleware_class=type, priority=-1)
+
+    @pytest.mark.unit
+    def test_priority_above_max_raises(self) -> None:
+        with pytest.raises(ValueError, match="priority must be between"):
+            MiddlewareContribution(middleware_class=type, priority=500)
+
+    @pytest.mark.unit
+    def test_priority_at_boundaries_ok(self) -> None:
+        mc_min = MiddlewareContribution(middleware_class=type, priority=0)
+        assert mc_min.priority == 0
+        mc_max = MiddlewareContribution(middleware_class=type, priority=499)
+        assert mc_max.priority == 499
 
 
 class TestErrorHandlerContribution:
@@ -72,3 +94,23 @@ class TestLifespanContribution:
         lc = LifespanContribution(hook=lambda app: None)
         with pytest.raises(AttributeError):
             lc.priority = 10  # type: ignore[misc]
+
+
+class TestLifespanPriorityConstants:
+    @pytest.mark.unit
+    def test_priority_ordering(self) -> None:
+        assert (
+            LIFESPAN_PRIORITY_OBSERVABILITY
+            < LIFESPAN_PRIORITY_PERSISTENCE
+            < LIFESPAN_PRIORITY_EVENTSTORE
+            < LIFESPAN_PRIORITY_TASKIQ
+            < LIFESPAN_PRIORITY_PROJECTIONS
+        )
+
+    @pytest.mark.unit
+    def test_known_values(self) -> None:
+        assert LIFESPAN_PRIORITY_OBSERVABILITY == 50
+        assert LIFESPAN_PRIORITY_PERSISTENCE == 75
+        assert LIFESPAN_PRIORITY_EVENTSTORE == 100
+        assert LIFESPAN_PRIORITY_TASKIQ == 150
+        assert LIFESPAN_PRIORITY_PROJECTIONS == 200

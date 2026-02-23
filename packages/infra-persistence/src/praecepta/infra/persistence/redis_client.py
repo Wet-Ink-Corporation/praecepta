@@ -55,6 +55,7 @@ class RedisFactory:
             settings: Validated RedisSettings instance.
         """
         self._settings = settings
+        self._pool: Any = None
         self._client: Any = None
 
     @classmethod
@@ -122,31 +123,38 @@ class RedisFactory:
         return self._client
 
     async def _create_client(self) -> Any:
-        """Create Redis async client from settings.
+        """Create Redis async client with explicit connection pool.
+
+        Creates a ConnectionPool explicitly and passes it to Redis() for
+        deterministic lifecycle management (CF-22).
 
         Returns:
-            Configured async Redis client.
+            Configured async Redis client with explicit pool.
         """
         import redis.asyncio as aioredis
 
-        client: Any = aioredis.from_url(  # type: ignore[no-untyped-call]
+        self._pool = aioredis.ConnectionPool.from_url(
             self._settings.get_url(),
             max_connections=self._settings.redis_pool_size,
             socket_timeout=self._settings.redis_socket_timeout,
             socket_connect_timeout=self._settings.redis_socket_connect_timeout,
             decode_responses=False,
         )
+        client: Any = aioredis.Redis(connection_pool=self._pool)
         return client
 
     async def close(self) -> None:
-        """Close the Redis client and release resources.
+        """Close the Redis client, connection pool, and release resources.
 
         Should be called when shutting down application to cleanly close
-        connections.
+        connections. Closes both the client and the explicit connection pool.
         """
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+        if self._pool is not None:
+            await self._pool.aclose()
+            self._pool = None
 
 
 @lru_cache(maxsize=1)

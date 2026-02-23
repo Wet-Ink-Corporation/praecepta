@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +42,26 @@ class CORSSettings(BaseSettings):
             return v
         return ["*"]
 
+    @model_validator(mode="after")
+    def _validate_credentials_with_wildcard(self) -> CORSSettings:
+        if self.allow_credentials and self.allow_origins == ["*"]:
+            msg = (
+                "CORS allow_credentials=True cannot be used with allow_origins=['*']. "
+                "Browsers will reject the response. Specify explicit origins instead."
+            )
+            raise ValueError(msg)
+        return self
+
+
+def _default_version() -> str:
+    """Resolve default app version from package metadata."""
+    try:
+        from importlib.metadata import version
+
+        return version("praecepta-infra-fastapi")
+    except Exception:
+        return "0.0.0"
+
 
 class AppSettings(BaseSettings):
     """Application factory settings.
@@ -55,7 +75,7 @@ class AppSettings(BaseSettings):
     )
 
     title: str = Field(default="Praecepta Application")
-    version: str = Field(default="0.1.0")
+    version: str = Field(default=_default_version())
     description: str = Field(default="")
     docs_url: str | None = Field(default="/docs")
     redoc_url: str | None = Field(default="/redoc")

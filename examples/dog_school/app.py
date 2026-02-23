@@ -27,8 +27,11 @@ _DEFAULT_EXCLUDE_NAMES = frozenset(
     {
         "api_key_auth",  # Needs API-key repository
         "jwt_auth",  # Needs JWKS endpoint
+        "auth",  # Auth lifespan needs JWKS endpoint
         "event_store",  # Needs PostgreSQL
+        "persistence",  # Needs PostgreSQL + Redis
         "observability",  # Needs OTel collector (optional, but noisy in dev)
+        "taskiq",  # Needs Redis broker
     }
 )
 

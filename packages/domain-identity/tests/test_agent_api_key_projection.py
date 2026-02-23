@@ -47,6 +47,14 @@ def _make_api_key_rotated_event(
 
 
 @pytest.mark.unit
+class TestAgentAPIKeyProjectionUpstream:
+    def test_declares_upstream_application(self) -> None:
+        from praecepta.domain.identity.agent_app import AgentApplication
+
+        assert AgentAPIKeyProjection.upstream_application is AgentApplication
+
+
+@pytest.mark.unit
 class TestAgentAPIKeyProjectionTopics:
     def test_subscribes_to_agent_key_events(self) -> None:
         assert len(AgentAPIKeyProjection.topics) == 2

@@ -39,7 +39,7 @@ def resolve_dev_bypass(requested: bool) -> bool:
     if not requested:
         return False
 
-    env = os.environ.get("ENVIRONMENT", "development")
+    env = os.environ.get("ENVIRONMENT", "development").lower()
 
     if env == "production":
         logger.error(
