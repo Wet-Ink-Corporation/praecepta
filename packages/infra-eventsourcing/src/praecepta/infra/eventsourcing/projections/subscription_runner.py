@@ -39,6 +39,7 @@ See Also:
 from __future__ import annotations
 
 import logging
+from threading import Event, Thread
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -46,6 +47,8 @@ if TYPE_CHECKING:
     from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 logger = logging.getLogger(__name__)
+
+_HEALTH_CHECK_INTERVAL_SECONDS = 2.0
 
 
 class SubscriptionProjectionRunner:
@@ -86,6 +89,8 @@ class SubscriptionProjectionRunner:
         self._env = env
         self._runners: list[ProjectionRunner[Any, Any]] = []
         self._started = False
+        self._stop_monitor = Event()
+        self._monitor_thread: Thread | None = None
 
     def start(self) -> None:
         """Start a projection runner for each projection.
@@ -124,6 +129,16 @@ class SubscriptionProjectionRunner:
             runner.__enter__()
             self._runners.append(runner)
 
+        # Start health monitor to detect processing thread failures
+        if self._runners:
+            self._stop_monitor.clear()
+            self._monitor_thread = Thread(
+                target=self._monitor_health,
+                daemon=True,
+                name=f"projection-monitor-{self._upstream_application.__name__}",
+            )
+            self._monitor_thread.start()
+
         self._started = True
         logger.info("Subscription runners started")
 
@@ -138,6 +153,13 @@ class SubscriptionProjectionRunner:
             return
 
         logger.info("Stopping subscription runners...")
+
+        # Stop health monitor before runners to avoid false positives
+        self._stop_monitor.set()
+        if self._monitor_thread is not None:
+            self._monitor_thread.join(timeout=5.0)
+            self._monitor_thread = None
+
         for runner in reversed(self._runners):
             try:
                 runner.__exit__(None, None, None)
@@ -150,6 +172,41 @@ class SubscriptionProjectionRunner:
         self._runners.clear()
         self._started = False
         logger.info("Subscription runners stopped")
+
+    def _monitor_health(self) -> None:
+        """Watch for processing thread failures and log immediately.
+
+        The eventsourcing library's ``ProjectionRunner`` stores errors in
+        ``_thread_error`` but never logs them — they only surface at
+        shutdown via ``__exit__()``.  This monitor polls runner health so
+        operators can detect stalled projections without waiting for
+        application shutdown.
+        """
+        reported: set[int] = set()
+        while not self._stop_monitor.is_set():
+            for i, runner in enumerate(self._runners):
+                if i in reported:
+                    continue
+                if not runner.is_interrupted.is_set():
+                    continue
+                reported.add(i)
+                proj_name = type(runner.projection).__name__
+                error = runner._thread_error
+                if error is not None:
+                    logger.error(
+                        "Projection %s processing thread failed: %s",
+                        proj_name,
+                        error,
+                        exc_info=error,
+                    )
+                else:
+                    logger.warning(
+                        "Projection %s processing thread stopped unexpectedly (no error captured)",
+                        proj_name,
+                    )
+            if len(reported) == len(self._runners):
+                break
+            self._stop_monitor.wait(timeout=_HEALTH_CHECK_INTERVAL_SECONDS)
 
     @property
     def is_running(self) -> bool:

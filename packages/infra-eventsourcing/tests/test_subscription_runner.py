@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import time
+from threading import Event as ThreadEvent
 from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
@@ -218,3 +221,123 @@ class TestSubscriptionProjectionRunnerLifecycle:
 
         runner.stop()
         assert not runner.is_running
+
+
+# ---------------------------------------------------------------------------
+# Tests: Health Monitoring
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestSubscriptionProjectionRunnerHealthMonitor:
+    """Tests for the background health monitoring thread."""
+
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_monitor_logs_error_on_processing_failure(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Health monitor logs immediately when a processing thread fails."""
+        # Simulate a runner whose processing thread has already failed
+        failed_event = ThreadEvent()
+        failed_event.set()
+
+        mock_runner = MagicMock()
+        mock_runner.is_interrupted = failed_event
+        mock_runner._thread_error = RuntimeError("DB connection refused")
+        mock_runner.projection = type("BrokenProjection", (), {})()
+        mock_runner_cls.return_value = mock_runner
+
+        runner = SubscriptionProjectionRunner(
+            projections=[_StubProjection],
+            upstream_application=_FakeApp,
+        )
+
+        with caplog.at_level(logging.ERROR):
+            runner.start()
+            time.sleep(0.3)
+
+        runner.stop()
+
+        assert "BrokenProjection" in caplog.text
+        assert "processing thread failed" in caplog.text
+
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_monitor_logs_warning_on_unexpected_stop(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Monitor logs warning if processing thread stops without error."""
+        stopped_event = ThreadEvent()
+        stopped_event.set()
+
+        mock_runner = MagicMock()
+        mock_runner.is_interrupted = stopped_event
+        mock_runner._thread_error = None
+        mock_runner.projection = type("StoppedProjection", (), {})()
+        mock_runner_cls.return_value = mock_runner
+
+        runner = SubscriptionProjectionRunner(
+            projections=[_StubProjection],
+            upstream_application=_FakeApp,
+        )
+
+        with caplog.at_level(logging.WARNING):
+            runner.start()
+            time.sleep(0.3)
+
+        runner.stop()
+
+        assert "StoppedProjection" in caplog.text
+        assert "stopped unexpectedly" in caplog.text
+
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_monitor_not_started_for_empty_projections(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
+        """No monitor thread is created when there are no projections."""
+        runner = SubscriptionProjectionRunner(
+            projections=[],
+            upstream_application=_FakeApp,
+        )
+        runner.start()
+        assert runner._monitor_thread is None
+        runner.stop()
+
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_normal_shutdown_does_not_log_errors(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Normal shutdown stops monitor before runners — no spurious errors."""
+        healthy_event = ThreadEvent()  # Not set — runner is healthy
+
+        mock_runner = MagicMock()
+        mock_runner.is_interrupted = healthy_event
+        mock_runner._thread_error = None
+        mock_runner.projection = type("HealthyProjection", (), {})()
+        mock_runner_cls.return_value = mock_runner
+
+        runner = SubscriptionProjectionRunner(
+            projections=[_StubProjection],
+            upstream_application=_FakeApp,
+        )
+
+        with caplog.at_level(logging.WARNING):
+            runner.start()
+            runner.stop()
+
+        assert "processing thread failed" not in caplog.text
+        assert "stopped unexpectedly" not in caplog.text
