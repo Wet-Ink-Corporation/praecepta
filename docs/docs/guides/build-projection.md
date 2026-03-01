@@ -1,68 +1,110 @@
 # Build a Projection
 
-Projections transform event streams into read-optimized views (read models). They subscribe to events and maintain materialized state.
+Projections transform event streams into read-optimized views (read models). They subscribe to events from an upstream application and maintain materialized state in SQL tables.
 
 ## The Pattern
 
-Projections extend `BaseProjection` and define handler methods for each event type:
+Projections extend `BaseProjection` and implement `process_event()` to handle domain events:
 
 ```python
+from typing import Any, ClassVar
+
+from eventsourcing.dispatch import singledispatchmethod
+from eventsourcing.persistence import Tracking, TrackingRecorder
+
 from praecepta.infra.eventsourcing import BaseProjection
-from my_app.events import OrderPlaced, OrderShipped
+from my_app.application import OrderApplication
+
 
 class OrderSummaryProjection(BaseProjection):
-    def handle_order_placed(self, event: OrderPlaced) -> None:
-        # Insert or update a read model table
-        self.execute(
-            "INSERT INTO order_summaries (order_id, tenant_id, total, status) "
-            "VALUES (:order_id, :tenant_id, :total, 'placed')",
-            order_id=event.order_id,
+    """Materializes order events into an order_summaries read model."""
+
+    upstream_application: ClassVar[type[Any]] = OrderApplication
+
+    topics: ClassVar[tuple[str, ...]] = (
+        "my_app.order:Order.Placed",
+        "my_app.order:Order.Shipped",
+    )
+
+    def __init__(
+        self,
+        view: TrackingRecorder,
+        repository: OrderSummaryRepository | None = None,
+    ) -> None:
+        super().__init__(view=view)
+        if repository is None:
+            repository = OrderSummaryRepository(...)
+        self._repo = repository
+
+    @singledispatchmethod
+    def process_event(self, domain_event: Any, tracking: Tracking) -> None:
+        """Default: ignore unknown events, track position."""
+        event_name = domain_event.__class__.__name__
+        if event_name == "Placed":
+            self._handle_placed(domain_event)
+        elif event_name == "Shipped":
+            self._handle_shipped(domain_event)
+        self.view.insert_tracking(tracking)
+
+    def _handle_placed(self, event: Any) -> None:
+        self._repo.upsert(
+            order_id=str(event.originator_id),
             tenant_id=str(event.tenant_id),
             total=event.total,
+            status="placed",
         )
 
-    def handle_order_shipped(self, event: OrderShipped) -> None:
-        self.execute(
-            "UPDATE order_summaries SET status = 'shipped', "
-            "tracking_number = :tracking WHERE order_id = :order_id",
-            tracking=event.tracking_number,
-            order_id=event.order_id,
+    def _handle_shipped(self, event: Any) -> None:
+        self._repo.update_status(
+            order_id=str(event.originator_id),
+            status="shipped",
+            tracking_number=event.tracking_number,
         )
+
+    def clear_read_model(self) -> None:
+        self._repo.truncate()
 ```
 
-## Handler Naming
+### Key Requirements
 
-Handler methods follow the convention `handle_{snake_case_event_name}`:
+1. **`upstream_application`** — declares which `Application` class produces events this projection consumes. Required for auto-discovery wiring.
 
-| Event Class | Handler Method |
-|-------------|---------------|
-| `OrderPlaced` | `handle_order_placed` |
-| `TenantCreated` | `handle_tenant_created` |
-| `UserDeactivated` | `handle_user_deactivated` |
+2. **`topics`** — optional tuple of event topic strings to filter which events are delivered. Format: `"module.path:ClassName.EventName"`. If omitted, all events from the upstream application are delivered.
 
-## Multi-Tenancy Requirement
+3. **`process_event(self, domain_event, tracking)`** — called by the framework for each event. After writing to the read model, you **must** call `self.view.insert_tracking(tracking)` to record the processed position.
 
-Every projection table **must** include a `tenant_id` column for Row-Level Security (RLS). This is a framework invariant:
+4. **`clear_read_model()`** — abstract method called during rebuilds. Must delete all projection data (TRUNCATE or DELETE).
 
-```sql
-CREATE TABLE order_summaries (
-    order_id TEXT PRIMARY KEY,
-    tenant_id UUID NOT NULL,    -- Required for RLS
-    total NUMERIC NOT NULL,
-    status TEXT NOT NULL
-);
+5. **Constructor** — receives a `view: TrackingRecorder` parameter (the framework's position tracker). Pass it to `super().__init__(view=view)`.
+
+### Event Routing
+
+The eventsourcing library creates event classes dynamically via the `@event` decorator, so standard `singledispatch` registration by type doesn't work. Instead, route events by class name:
+
+```python
+@singledispatchmethod
+def process_event(self, domain_event: Any, tracking: Tracking) -> None:
+    event_name = domain_event.__class__.__name__
+    if event_name == "Placed":
+        self._handle_placed(domain_event)
+    elif event_name == "Shipped":
+        self._handle_shipped(domain_event)
+    self.view.insert_tracking(tracking)
 ```
+
+### Idempotency Requirement
+
+All handlers **must** be idempotent. Use UPSERT patterns (INSERT ON CONFLICT UPDATE) so that replaying events during rebuilds produces the same result. The tracking position and read model writes are in separate transactions — if the process crashes between them, the event will be reprocessed on restart.
 
 ## The `clear_read_model` Contract
 
-Every projection must implement `clear_read_model()`. This method drops and recreates the projection's read model tables. It is called by `ProjectionRebuilder` when a projection needs to be rebuilt from scratch (e.g. after a schema change or logic fix):
+Every projection must implement `clear_read_model()`. This method is called by `ProjectionRebuilder` when a projection needs to be rebuilt from scratch (e.g. after a schema change or logic fix):
 
 ```python
-class OrderSummaryProjection(BaseProjection):
-    def clear_read_model(self) -> None:
-        self.execute("DELETE FROM order_summaries")
-
-    # ... handlers
+def clear_read_model(self) -> None:
+    with self._session_factory() as session:
+        session.execute(text("TRUNCATE TABLE order_summaries"))
+        session.commit()
 ```
 
 ## Registering Projections
@@ -85,47 +127,56 @@ The framework discovers both projections and applications at startup and wires t
 
 ## How Projections Run
 
-At startup, the `projection_runner_lifespan` hook (priority 200) discovers all registered projections and applications, then creates a `ProjectionPoller` for each application. Each poller:
+At startup, the `projection_runner_lifespan` hook (priority 200) discovers all registered projections, groups them by `upstream_application`, and creates a `SubscriptionProjectionRunner` for each application group. Each runner:
 
-1. Creates an internal eventsourcing `System` that wires projections to the upstream application
-2. Starts a **background polling thread** that periodically calls `pull_and_process()` on each projection
-3. `pull_and_process()` reads new events from the shared **PostgreSQL notification log** and processes them through the projection's handler methods
-4. Each projection tracks its own position in the notification log, so it resumes where it left off after a restart
+1. Creates a `ProjectionRunner` per projection, which instantiates one upstream `Application` and one `PostgresTrackingRecorder` (view)
+2. Uses PostgreSQL **LISTEN/NOTIFY** for push-based event delivery — no polling
+3. Each projection tracks its own position via the tracking recorder, resuming where it left off after a restart
 
-This polling-based approach works correctly in production where the API process writes events and the projection runner reads them from the shared database — they do not need to be in the same process or share application instances.
+### Connection Pool Budget
 
-### Configuring the Poller
+Each `ProjectionRunner` creates two connection pools: one for the upstream application (reads events) and one for the tracking recorder (writes position). The projection lifespan uses smaller pool sizes for these (default: pool_size=2, max_overflow=3) since they handle minimal traffic.
 
-The polling behaviour is controlled via environment variables:
+At startup, the framework logs an estimated connection budget and warns if the total exceeds `POSTGRES_MAX_CONNECTIONS`:
+
+```text
+Connection pool budget: 3 API app(s) (24 max conn) + 4 projection(s) x 2 pools (40 max conn) = 64 estimated total
+```
+
+### Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PROJECTION_POLL_INTERVAL` | `1.0` | Seconds between poll cycles (0.1–60) |
-| `PROJECTION_POLL_TIMEOUT` | `10.0` | Max seconds for graceful shutdown (1–120) |
-| `PROJECTION_POLL_ENABLED` | `true` | Set to `false` to disable projection processing |
-
-For most deployments the defaults are fine. Lower the poll interval if you need faster eventual consistency; raise it to reduce database polling overhead.
+| `POSTGRES_PROJECTION_POOL_SIZE` | `2` | Pool size for projection upstream apps and tracking recorders |
+| `POSTGRES_PROJECTION_MAX_OVERFLOW` | `3` | Max overflow for projection pools |
+| `MAX_PROJECTION_RUNNERS` | `8` | Maximum number of projection runners (caps discovered projections) |
 
 ## Projection Execution Model
 
-Projections run synchronously (`def`, not `async def`). This follows the sync-first event sourcing strategy (PADR-109) — events are processed in order, and projections must not introduce concurrency that could cause out-of-order updates.
+Projections run synchronously (`def`, not `async def`). This follows the sync-first event sourcing strategy — events are processed in order, and projections must not introduce concurrency that could cause out-of-order updates.
 
 ## Testing Projections
 
-Test projections by feeding them events directly:
+Test projections by constructing them with a mock view and repository:
 
 ```python
-def test_order_summary_projection(db_session):
-    projection = OrderSummaryProjection(session=db_session)
+from unittest.mock import MagicMock
 
-    projection.handle_order_placed(OrderPlaced(
-        order_id="ORD-1",
-        tenant_id=TenantId("..."),
-        total=Decimal("99.99"),
-    ))
+def test_order_summary_upserts_on_placed() -> None:
+    mock_repo = MagicMock()
+    mock_view = MagicMock()
+    projection = OrderSummaryProjection(view=mock_view, repository=mock_repo)
 
-    result = db_session.execute(
-        "SELECT status FROM order_summaries WHERE order_id = 'ORD-1'"
-    ).fetchone()
-    assert result.status == "placed"
+    event = MagicMock()
+    event.__class__ = type("Placed", (), {})
+    event.__class__.__name__ = "Placed"
+    event.originator_id = uuid4()
+    event.tenant_id = "acme-corp"
+    event.total = Decimal("99.99")
+
+    projection.process_event(event, MagicMock())
+
+    mock_repo.upsert.assert_called_once()
+    call_kwargs = mock_repo.upsert.call_args.kwargs
+    assert call_kwargs["status"] == "placed"
 ```

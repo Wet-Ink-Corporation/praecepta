@@ -52,40 +52,60 @@ DATABASE_URL=postgresql://user:pass@host:5432/dbname
 POSTGRES_SCHEMA=myapp   # Override just the schema
 ```
 
-## Projection Polling Configuration
+## Projection Configuration
 
-Projections run via a background polling thread that reads events from the shared PostgreSQL notification log. Configuration is via `PROJECTION_*` environment variables:
+Projections use PostgreSQL LISTEN/NOTIFY for push-based event delivery via `SubscriptionProjectionRunner`. This replaces the previous polling-based `ProjectionPoller` (removed in v2.0.0).
+
+### Connection Pool Settings
+
+Each projection creates two small connection pools: one for the upstream application (reading events) and one for the tracking recorder (writing position). These use separate, smaller pool sizes to minimize connection usage:
 
 | Variable | Default | Range | Description |
 |----------|---------|-------|-------------|
-| `PROJECTION_POLL_INTERVAL` | `1.0` | 0.1–60.0 | Seconds between poll cycles |
-| `PROJECTION_POLL_TIMEOUT` | `10.0` | 1.0–120.0 | Max seconds for graceful shutdown |
-| `PROJECTION_POLL_ENABLED` | `true` | — | Set to `false` to disable projection processing |
+| `POSTGRES_PROJECTION_POOL_SIZE` | `2` | 1–20 | Base pool size for projection contexts |
+| `POSTGRES_PROJECTION_MAX_OVERFLOW` | `3` | 0–20 | Max overflow for projection pools |
+| `MAX_PROJECTION_RUNNERS` | `8` | 1–32 | Cap on total projection runners |
+| `POSTGRES_MAX_CONNECTIONS` | `100` | — | Used for budget warning (not enforced) |
 
-### Tuning the Poll Interval
+### Connection Budget
 
-- **Lower values** (e.g. `0.5`) reduce the delay between an event being written and the projection being updated, at the cost of more frequent database queries.
-- **Higher values** (e.g. `5.0`) reduce database polling overhead, suitable for systems where near-real-time read model updates are not required.
-- For most deployments, the default of `1.0` second provides a good balance.
+At startup, the framework logs an estimated connection budget:
 
-### Disabling Projections
+```text
+Connection pool budget: 3 API app(s) (24 max conn) + 4 projection(s) x 2 pools (40 max conn) = 64 estimated total
+```
 
-Set `PROJECTION_POLL_ENABLED=false` to start the application without running projections. This is useful for:
+If the estimate exceeds `POSTGRES_MAX_CONNECTIONS`, a warning is logged suggesting you reduce projection pool sizes or increase the PostgreSQL connection limit.
 
-- **API-only deployments** where projections run in a separate process
-- **Migration or maintenance windows** where projection processing should be paused
-- **Development** when you only need the write side
+**Typical budget for 3 API apps + 4 projections:**
+
+| Component                      | Pools | Max per pool | Total    |
+| ------------------------------ | ----- | ------------ | -------- |
+| API Applications               | 3     | 5 + 10 = 15  | 45       |
+| Projection upstream apps       | 4     | 2 + 3 = 5    | 20       |
+| Projection tracking recorders  | 4     | 2 + 3 = 5    | 20       |
+| SQLAlchemy (read models)       | 1     | ~20          | 20       |
+| **Total**                      |       |              | **~105** |
+
+To reduce this, lower `POSTGRES_PROJECTION_POOL_SIZE` to `1` and `POSTGRES_PROJECTION_MAX_OVERFLOW` to `1`:
+
+```bash
+POSTGRES_PROJECTION_POOL_SIZE=1
+POSTGRES_PROJECTION_MAX_OVERFLOW=1
+```
+
+This brings projection connection usage from 40 to 16, yielding ~81 total.
 
 ## Lifespan Hook Ordering
 
 The eventsourcing package registers two lifespan hooks with specific priorities:
 
-| Hook | Priority | Purpose |
-|------|----------|---------|
-| `event_store_lifespan` | 100 | Bridges `EventSourcingSettings` to `os.environ`, initialises `EventStoreFactory` singleton |
-| `projection_runner_lifespan` | 200 | Discovers projections and applications, starts `ProjectionPoller` instances |
+| Hook                         | Priority | Purpose                                             |
+| ---------------------------- | -------- | --------------------------------------------------- |
+| `event_store_lifespan`       | 100      | Bridges settings to `os.environ`, inits event store |
+| `projection_runner_lifespan` | 200      | Discovers projections, starts subscription runners  |
 
-Priority 100 runs before 200, which is required because `Application` subclasses (used inside the poller) read their configuration from `os.environ` — the bridge must run first.
+Priority 100 runs before 200, which is required because `Application` subclasses (used inside the projection runners) read their configuration from `os.environ` — the bridge must run first.
 
 ## Deployment Patterns
 
@@ -99,29 +119,28 @@ POSTGRES_DBNAME=myapp
 POSTGRES_HOST=localhost
 POSTGRES_USER=app
 POSTGRES_PASSWORD=secret
-PROJECTION_POLL_ENABLED=true
 ```
 
-The API handles HTTP requests while projections poll in a background thread.
+The API handles HTTP requests while projection runners process events via LISTEN/NOTIFY in background threads.
 
 ### Separate Projection Worker
 
-For larger deployments, run projections in a dedicated process:
+For larger deployments, run projections in a dedicated process. Use `MAX_PROJECTION_RUNNERS=0` or avoid registering projection entry points in the API process:
 
 **API process:**
 ```bash
-PROJECTION_POLL_ENABLED=false
+MAX_PROJECTION_RUNNERS=0
 # ... other POSTGRES_* vars
 ```
 
 **Projection worker process:**
 ```bash
-PROJECTION_POLL_ENABLED=true
-PROJECTION_POLL_INTERVAL=0.5   # Lower for faster updates
+POSTGRES_PROJECTION_POOL_SIZE=2
+POSTGRES_PROJECTION_MAX_OVERFLOW=3
 # ... same POSTGRES_* vars (shared database)
 ```
 
-Both processes connect to the same PostgreSQL database. The API writes events, and the projection worker reads them from the shared notification log.
+Both processes connect to the same PostgreSQL database. The API writes events, and the projection worker receives them via LISTEN/NOTIFY.
 
 ### Dockerfile Layer Separation
 
