@@ -66,9 +66,10 @@ class TestAgentAPIKeyProjectionTopics:
 class TestAgentAPIKeyProjectionPolicy:
     def test_upserts_on_api_key_issued(self) -> None:
         mock_repo = MagicMock()
-        projection = AgentAPIKeyProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = AgentAPIKeyProjection(view=mock_view, repository=mock_repo)
         event = _make_api_key_issued_event()
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
         mock_repo.upsert.assert_called_once()
         call_kwargs = mock_repo.upsert.call_args.kwargs
         assert call_kwargs["key_id"] == "abc12345"
@@ -76,9 +77,10 @@ class TestAgentAPIKeyProjectionPolicy:
 
     def test_revokes_and_upserts_on_rotation(self) -> None:
         mock_repo = MagicMock()
-        projection = AgentAPIKeyProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = AgentAPIKeyProjection(view=mock_view, repository=mock_repo)
         event = _make_api_key_rotated_event()
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
         # Should revoke old key and upsert new key
         mock_repo.update_status.assert_called_once_with(key_id="old12345", status="revoked")
         mock_repo.upsert.assert_called_once()
@@ -88,9 +90,10 @@ class TestAgentAPIKeyProjectionPolicy:
 
     def test_ignores_unknown_events(self) -> None:
         mock_repo = MagicMock()
-        projection = AgentAPIKeyProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = AgentAPIKeyProjection(view=mock_view, repository=mock_repo)
         event = MagicMock()
         event.__class__.__name__ = "Registered"
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
         mock_repo.upsert.assert_not_called()
         mock_repo.update_status.assert_not_called()

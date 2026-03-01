@@ -6,18 +6,16 @@ tenant_configuration projection table via UPSERT pattern.
 
 from __future__ import annotations
 
-from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, ClassVar
+
+from eventsourcing.dispatch import singledispatchmethod
 
 from praecepta.domain.tenancy.tenant_app import TenantApplication
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
-    from eventsourcing.application import ProcessingEvent
     from eventsourcing.domain import DomainEvent
-    from eventsourcing.utils import EnvType
+    from eventsourcing.persistence import Tracking, TrackingRecorder
 
     from praecepta.domain.tenancy.infrastructure.config_repository import (
         ConfigRepository,
@@ -45,11 +43,11 @@ class TenantConfigProjection(BaseProjection):
 
     def __init__(
         self,
+        view: TrackingRecorder,
         repository: ConfigRepository | None = None,
         cache: ConfigCache | None = None,
-        env: EnvType | None = None,
     ) -> None:
-        super().__init__(env=env)
+        super().__init__(view=view)
         if repository is None:
             from praecepta.domain.tenancy.infrastructure.config_repository import (
                 ConfigRepository as _ConfigRepository,
@@ -61,10 +59,10 @@ class TenantConfigProjection(BaseProjection):
         self._cache = cache
 
     @singledispatchmethod
-    def policy(
+    def process_event(
         self,
         domain_event: DomainEvent,
-        processing_event: ProcessingEvent[UUID],
+        tracking: Tracking,
     ) -> None:
         """Route events by class name.
 
@@ -72,12 +70,12 @@ class TenantConfigProjection(BaseProjection):
         We check the class name to handle ConfigUpdated events.
         """
         if domain_event.__class__.__name__ == "ConfigUpdated":
-            self._handle_config_updated(domain_event, processing_event)
+            self._handle_config_updated(domain_event)
+        self.view.insert_tracking(tracking)
 
     def _handle_config_updated(
         self,
         event: DomainEvent,
-        processing_event: ProcessingEvent[UUID],
     ) -> None:
         """Handle Tenant.ConfigUpdated: UPSERT into projection, invalidate cache."""
         self._repo.upsert(

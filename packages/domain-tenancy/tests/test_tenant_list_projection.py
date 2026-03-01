@@ -74,15 +74,16 @@ class TestTenantListProjectionTopics:
 
 @pytest.mark.unit
 class TestTenantListProjectionPolicy:
-    """Event handling via policy method."""
+    """Event handling via process_event method."""
 
     def test_upserts_on_provisioned(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantListProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantListProjection(view=mock_view, repository=mock_repo)
         event = _make_event(event_name="Provisioned", slug="acme-corp", name="ACME")
-        mock_processing = MagicMock()
+        mock_tracking = MagicMock()
 
-        projection.policy(event, mock_processing)
+        projection.process_event(event, mock_tracking)
 
         mock_repo.upsert.assert_called_once_with(
             tenant_id=str(event.originator_id),
@@ -94,10 +95,11 @@ class TestTenantListProjectionPolicy:
 
     def test_updates_status_on_activated(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantListProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantListProjection(view=mock_view, repository=mock_repo)
         event = _make_event(event_name="Activated")
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
 
         mock_repo.update_status.assert_called_once_with(
             tenant_id=str(event.originator_id),
@@ -108,10 +110,11 @@ class TestTenantListProjectionPolicy:
 
     def test_updates_status_on_suspended(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantListProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantListProjection(view=mock_view, repository=mock_repo)
         event = _make_event(event_name="Suspended")
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
 
         mock_repo.update_status.assert_called_once_with(
             tenant_id=str(event.originator_id),
@@ -122,10 +125,11 @@ class TestTenantListProjectionPolicy:
 
     def test_updates_status_on_reactivated(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantListProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantListProjection(view=mock_view, repository=mock_repo)
         event = _make_event(event_name="Reactivated")
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
 
         mock_repo.update_status.assert_called_once_with(
             tenant_id=str(event.originator_id),
@@ -136,10 +140,11 @@ class TestTenantListProjectionPolicy:
 
     def test_updates_status_on_decommissioned(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantListProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantListProjection(view=mock_view, repository=mock_repo)
         event = _make_event(event_name="Decommissioned")
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
 
         mock_repo.update_status.assert_called_once_with(
             tenant_id=str(event.originator_id),
@@ -150,10 +155,11 @@ class TestTenantListProjectionPolicy:
 
     def test_ignores_config_updated_events(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantListProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantListProjection(view=mock_view, repository=mock_repo)
         event = _make_event(event_name="ConfigUpdated")
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
 
         mock_repo.upsert.assert_not_called()
         mock_repo.update_status.assert_not_called()

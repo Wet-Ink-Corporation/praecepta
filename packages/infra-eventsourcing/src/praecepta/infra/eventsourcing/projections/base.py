@@ -2,8 +2,28 @@
 
 This module provides the foundational projection infrastructure that all
 read model projections across bounded contexts will inherit from. BaseProjection
-extends the eventsourcing library's ProcessApplication class with rebuild
-capabilities, topic filtering, and standardized patterns.
+extends the eventsourcing library's lightweight ``Projection`` class (not
+``ProcessApplication``) — suited for projections that write to external read
+models without emitting downstream events.
+
+Architecture Note:
+    The library provides two projection paths:
+
+    1. **Projection** (this base class): lightweight, no event store, no extra
+       connection pool.  The ``process_event()`` method receives a domain event
+       and a ``Tracking`` object; the handler writes to the read model and then
+       calls ``self.view.insert_tracking(tracking)`` to record position.
+       Used with ``ProjectionRunner``.
+
+    2. **EventSourcedProjection / ProcessApplication**: heavyweight, gets its
+       own event store and ``ProcessRecorder`` with a separate connection pool.
+       Needed only when a projection must emit downstream events via
+       ``processing_event.collect_events()``.
+       Used with ``EventSourcedProjectionRunner``.
+
+    All current praecepta projections only write to SQL read models — they
+    never emit events.  Using ``Projection`` eliminates unnecessary connection
+    pools and event store tables.
 
 Example:
     Define a projection by subclassing BaseProjection::
@@ -17,25 +37,25 @@ Example:
             upstream_application = MyApplication
 
             @singledispatchmethod
-            def policy(self, domain_event, processing_event):
-                '''Default: ignore unknown events.'''
-                pass
+            def process_event(self, domain_event, tracking):
+                '''Default: ignore unknown events, track position.'''
+                self.view.insert_tracking(tracking)
 
-            @policy.register(ItemCreated)
-            def _(self, event: ItemCreated, processing_event):
+            @process_event.register(ItemCreated)
+            def _(self, event: ItemCreated, tracking):
                 '''Handle ItemCreated events.'''
-                # UPSERT into read model (idempotent pattern)
                 self._data[str(event.originator_id)] = {
                     "title": event.title,
                     "created_at": event.timestamp,
                 }
+                self.view.insert_tracking(tracking)
 
             def clear_read_model(self) -> None:
                 '''Clear all projection data for rebuild.'''
                 self._data.clear()
 
 Idempotency Requirement:
-    All policy handlers MUST be idempotent. Use UPSERT patterns or
+    All process_event handlers MUST be idempotent. Use UPSERT patterns or
     deduplication tables to ensure reprocessing produces the same result.
 
 See Also:
@@ -46,25 +66,24 @@ See Also:
 from __future__ import annotations
 
 from abc import abstractmethod
-from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, ClassVar
-from uuid import UUID
 
-from eventsourcing.system import ProcessApplication
+from eventsourcing.dispatch import singledispatchmethod
+from eventsourcing.projection import Projection
 
 if TYPE_CHECKING:
-    from eventsourcing.application import Application, ProcessingEvent
-    from eventsourcing.domain import DomainEvent
+    from eventsourcing.application import Application
+    from eventsourcing.persistence import Tracking
 
 
-class BaseProjection(ProcessApplication[UUID]):
-    """Base class for all projections.
+class BaseProjection(Projection["TrackingRecorder"]):
+    """Base class for all CQRS read model projections.
 
-    Extends eventsourcing.system.ProcessApplication with:
-    - Abstract clear_read_model() for rebuild support
+    Extends eventsourcing's lightweight ``Projection`` class with:
+    - Abstract ``clear_read_model()`` for rebuild support
     - Upstream application declaration for correct wiring
-    - Name property for tracking identification
     - Topics filtering for selective event subscription
+    - Default ``process_event()`` that tracks position for unknown events
 
     All read model projections MUST inherit from this class and declare
     their ``upstream_application`` class attribute.
@@ -79,7 +98,7 @@ class BaseProjection(ProcessApplication[UUID]):
             "module.path:ClassName" (from BaseEvent.get_topic()).
 
     See Also:
-        - eventsourcing.system.ProcessApplication: Library base class
+        - eventsourcing.projection.Projection: Library base class
         - praecepta.infra.eventsourcing.projections.subscription_runner: Lifecycle
         - praecepta.infra.eventsourcing.projections.rebuilder: Rebuild utilities
     """
@@ -87,46 +106,30 @@ class BaseProjection(ProcessApplication[UUID]):
     upstream_application: ClassVar[type[Application[Any]] | None] = None
     """The upstream application class that produces events this projection consumes."""
 
-    def get_projection_name(self) -> str:
-        """Get unique projection name for tracking table.
-
-        The name is used as the application_name in the tracking table
-        to store the last processed notification_id. This enables each
-        projection to maintain its own position independently.
-
-        This method uses the inherited 'name' attribute from ProcessApplication.
-        By default, this is the class name. Override in subclass if needed.
-
-        Returns:
-            Class name by default. Override for custom naming if multiple
-            instances of the same projection class are needed.
-        """
-        return self.name
-
     @singledispatchmethod
-    def policy(
-        self,
-        domain_event: DomainEvent,
-        processing_event: ProcessingEvent[UUID],
-    ) -> None:
+    def process_event(self, domain_event: Any, tracking: Tracking) -> None:
         """Process domain event and update read model.
 
-        Default implementation ignores unknown event types (no-op).
+        Default implementation ignores unknown event types but still tracks
+        position so the projection doesn't re-process the same events.
         Subclasses register handlers for specific event types using
-        the @policy.register decorator.
+        the ``@process_event.register`` decorator.
+
+        After writing to the read model, each handler MUST call
+        ``self.view.insert_tracking(tracking)`` to record the processed
+        position.
 
         Args:
             domain_event: The domain event to process. Contains originator_id,
                 originator_version, timestamp, and event-specific payload.
-            processing_event: Container for tracking and reaction events.
-                Use processing_event.collect_events() to emit new events
-                for cross-aggregate reactions.
+            tracking: Position tracking object. Must be passed to
+                ``self.view.insert_tracking()`` after processing.
 
         Note:
             This method is called by the eventsourcing library's
-            ProcessApplication infrastructure. Do not call directly.
+            ``ProjectionRunner`` infrastructure. Do not call directly.
         """
-        pass  # Ignore unknown events by default
+        self.view.insert_tracking(tracking)
 
     @abstractmethod
     def clear_read_model(self) -> None:

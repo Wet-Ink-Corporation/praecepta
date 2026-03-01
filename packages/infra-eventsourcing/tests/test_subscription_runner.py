@@ -71,12 +71,17 @@ class TestSubscriptionProjectionRunnerLifecycle:
         )
         runner.stop()  # Should not raise
 
-    @patch("eventsourcing.projection.EventSourcedProjectionRunner")
-    def test_start_creates_runner_per_projection(self, mock_es_runner_cls: MagicMock) -> None:
-        """Each projection gets its own EventSourcedProjectionRunner."""
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_start_creates_runner_per_projection(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
+        """Each projection gets its own ProjectionRunner."""
         mock_runner1 = MagicMock()
         mock_runner2 = MagicMock()
-        mock_es_runner_cls.side_effect = [mock_runner1, mock_runner2]
+        mock_runner_cls.side_effect = [mock_runner1, mock_runner2]
 
         runner = SubscriptionProjectionRunner(
             projections=[_StubProjection, _AnotherProjection],
@@ -85,22 +90,17 @@ class TestSubscriptionProjectionRunnerLifecycle:
         runner.start()
 
         assert runner.is_running
-        assert mock_es_runner_cls.call_count == 2
-        mock_es_runner_cls.assert_any_call(
-            application_class=_FakeApp,
-            projection_class=_StubProjection,
-            env=None,
-        )
-        mock_es_runner_cls.assert_any_call(
-            application_class=_FakeApp,
-            projection_class=_AnotherProjection,
-            env=None,
-        )
+        assert mock_runner_cls.call_count == 2
         mock_runner1.__enter__.assert_called_once()
         mock_runner2.__enter__.assert_called_once()
 
-    @patch("eventsourcing.projection.EventSourcedProjectionRunner")
-    def test_stop_exits_runners_in_reverse_order(self, mock_es_runner_cls: MagicMock) -> None:
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_stop_exits_runners_in_reverse_order(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
         """Runners are stopped in reverse order of creation."""
         mock_runner1 = MagicMock()
         mock_runner1.projection = MagicMock()
@@ -108,7 +108,7 @@ class TestSubscriptionProjectionRunnerLifecycle:
         mock_runner2 = MagicMock()
         mock_runner2.projection = MagicMock()
         type(mock_runner2.projection).__name__ = "Proj2"
-        mock_es_runner_cls.side_effect = [mock_runner1, mock_runner2]
+        mock_runner_cls.side_effect = [mock_runner1, mock_runner2]
 
         runner = SubscriptionProjectionRunner(
             projections=[_StubProjection, _AnotherProjection],
@@ -123,11 +123,16 @@ class TestSubscriptionProjectionRunnerLifecycle:
         for exit_mock in exit_calls:
             exit_mock.assert_called_once_with(None, None, None)
 
-    @patch("eventsourcing.projection.EventSourcedProjectionRunner")
-    def test_context_manager(self, mock_es_runner_cls: MagicMock) -> None:
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_context_manager(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
         """Context manager starts on enter, stops on exit."""
         mock_es_runner = MagicMock()
-        mock_es_runner_cls.return_value = mock_es_runner
+        mock_runner_cls.return_value = mock_es_runner
 
         runner = SubscriptionProjectionRunner(
             projections=[_StubProjection],
@@ -141,8 +146,13 @@ class TestSubscriptionProjectionRunnerLifecycle:
         assert not runner.is_running
         mock_es_runner.__exit__.assert_called_once()
 
-    @patch("eventsourcing.projection.EventSourcedProjectionRunner")
-    def test_stop_handles_runner_exit_error(self, mock_es_runner_cls: MagicMock) -> None:
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_stop_handles_runner_exit_error(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
         """If a runner's __exit__ raises, other runners are still stopped."""
         mock_runner1 = MagicMock()
         mock_runner1.projection = MagicMock()
@@ -151,7 +161,7 @@ class TestSubscriptionProjectionRunnerLifecycle:
         mock_runner2.projection = MagicMock()
         type(mock_runner2.projection).__name__ = "Proj2"
         mock_runner2.__exit__.side_effect = RuntimeError("cleanup failed")
-        mock_es_runner_cls.side_effect = [mock_runner1, mock_runner2]
+        mock_runner_cls.side_effect = [mock_runner1, mock_runner2]
 
         runner = SubscriptionProjectionRunner(
             projections=[_StubProjection, _AnotherProjection],
@@ -165,11 +175,16 @@ class TestSubscriptionProjectionRunnerLifecycle:
         # runner1 still stopped despite runner2 error
         mock_runner1.__exit__.assert_called_once()
 
-    @patch("eventsourcing.projection.EventSourcedProjectionRunner")
-    def test_env_passed_through(self, mock_es_runner_cls: MagicMock) -> None:
-        """Environment variables are passed to each EventSourcedProjectionRunner."""
-        mock_es_runner_cls.return_value = MagicMock()
-        env = {"PERSISTENCE_MODULE": "eventsourcing.postgres"}
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_env_passed_through(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
+        """Environment variables are passed to each ProjectionRunner."""
+        mock_runner_cls.return_value = MagicMock()
+        env = {"POSTGRES_POOL_SIZE": "2", "POSTGRES_MAX_OVERFLOW": "3"}
 
         runner = SubscriptionProjectionRunner(
             projections=[_StubProjection],
@@ -178,14 +193,20 @@ class TestSubscriptionProjectionRunnerLifecycle:
         )
         runner.start()
 
-        mock_es_runner_cls.assert_called_once_with(
+        mock_runner_cls.assert_called_once_with(
             application_class=_FakeApp,
             projection_class=_StubProjection,
+            view_class=mock_tracking_cls,
             env=env,
         )
 
-    @patch("eventsourcing.projection.EventSourcedProjectionRunner")
-    def test_empty_projections_list(self, mock_es_runner_cls: MagicMock) -> None:
+    @patch("eventsourcing.projection.ProjectionRunner")
+    @patch("eventsourcing.postgres.PostgresTrackingRecorder", new_callable=lambda: MagicMock)
+    def test_empty_projections_list(
+        self,
+        mock_tracking_cls: MagicMock,
+        mock_runner_cls: MagicMock,
+    ) -> None:
         """Empty projections list starts and stops without error."""
         runner = SubscriptionProjectionRunner(
             projections=[],
@@ -193,7 +214,7 @@ class TestSubscriptionProjectionRunnerLifecycle:
         )
         runner.start()
         assert runner.is_running
-        mock_es_runner_cls.assert_not_called()
+        mock_runner_cls.assert_not_called()
 
         runner.stop()
         assert not runner.is_running

@@ -133,6 +133,22 @@ class EventSourcingSettings(BaseSettings):
         description="Maximum number of projection runners (caps discovered projections)",
     )
 
+    # Projection-specific pool sizes (smaller than main pools since
+    # projection upstream apps only read events and tracking recorders
+    # only write position updates)
+    postgres_projection_pool_size: int = Field(
+        default=2,
+        ge=1,
+        le=20,
+        description="Pool size for projection upstream apps and tracking recorders",
+    )
+    postgres_projection_max_overflow: int = Field(
+        default=3,
+        ge=0,
+        le=20,
+        description="Max overflow for projection pools",
+    )
+
     # Advanced options
     postgres_pre_ping: bool = Field(
         default=False,
@@ -208,40 +224,3 @@ class EventSourcingSettings(BaseSettings):
             "POSTGRES_PRE_PING": "y" if self.postgres_pre_ping else "",
             "POSTGRES_SINGLE_ROW_TRACKING": "y" if self.postgres_single_row_tracking else "",
         }
-
-
-class ProjectionPollingSettings(BaseSettings):
-    """Configuration for projection polling behaviour.
-
-    .. deprecated::
-        ``ProjectionPollingSettings`` is only used by the deprecated
-        ``ProjectionPoller``.  The recommended ``SubscriptionProjectionRunner``
-        uses LISTEN/NOTIFY subscriptions and does not require polling settings.
-
-    Environment Variables:
-        PROJECTION_POLL_INTERVAL: Seconds between poll cycles (default: 1.0)
-        PROJECTION_POLL_TIMEOUT: Max wait for graceful stop (default: 10.0)
-        PROJECTION_POLL_ENABLED: Master switch (default: true)
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="PROJECTION_",
-        extra="ignore",
-    )
-
-    poll_interval: float = Field(
-        default=1.0,
-        ge=0.1,
-        le=60.0,
-        description="Seconds between polling cycles",
-    )
-    poll_timeout: float = Field(
-        default=10.0,
-        ge=1.0,
-        le=120.0,
-        description="Max seconds to wait for graceful shutdown",
-    )
-    poll_enabled: bool = Field(
-        default=True,
-        description="Enable polling (set False to disable projection processing)",
-    )

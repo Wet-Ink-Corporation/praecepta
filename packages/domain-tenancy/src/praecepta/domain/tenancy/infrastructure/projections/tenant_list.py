@@ -7,18 +7,16 @@ admin/control-plane use.
 
 from __future__ import annotations
 
-from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, ClassVar
+
+from eventsourcing.dispatch import singledispatchmethod
 
 from praecepta.domain.tenancy.tenant_app import TenantApplication
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
-    from eventsourcing.application import ProcessingEvent
     from eventsourcing.domain import DomainEvent
-    from eventsourcing.utils import EnvType
+    from eventsourcing.persistence import Tracking, TrackingRecorder
 
     from praecepta.domain.tenancy.infrastructure.tenant_repository import (
         TenantRepository,
@@ -49,10 +47,10 @@ class TenantListProjection(BaseProjection):
 
     def __init__(
         self,
+        view: TrackingRecorder,
         repository: TenantRepository | None = None,
-        env: EnvType | None = None,
     ) -> None:
-        super().__init__(env=env)
+        super().__init__(view=view)
         if repository is None:
             from praecepta.domain.tenancy.infrastructure.tenant_repository import (
                 TenantRepository as _TenantRepository,
@@ -63,18 +61,19 @@ class TenantListProjection(BaseProjection):
         self._repo = repository
 
     @singledispatchmethod
-    def policy(
+    def process_event(
         self,
         domain_event: DomainEvent,
-        processing_event: ProcessingEvent[UUID],
+        tracking: Tracking,
     ) -> None:
         """Route events by class name."""
         event_name = domain_event.__class__.__name__
         handler = self._handlers.get(event_name)
         if handler is not None:
             handler(self, domain_event)
+        self.view.insert_tracking(tracking)
 
-    _handlers: ClassVar[dict[str, object]] = {}
+    _handlers: ClassVar[dict[str, Any]] = {}
 
     def _handle_provisioned(self, event: DomainEvent) -> None:
         """Handle Tenant.Provisioned: INSERT into tenants table."""

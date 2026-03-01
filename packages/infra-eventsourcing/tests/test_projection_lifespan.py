@@ -64,6 +64,16 @@ class _OrphanProjection(BaseProjection):
         pass
 
 
+def _mock_settings() -> MagicMock:
+    """Create a mock EventSourcingSettings for tests."""
+    settings = MagicMock()
+    settings.postgres_projection_pool_size = 2
+    settings.postgres_projection_max_overflow = 3
+    settings.postgres_pool_size = 5
+    settings.postgres_max_overflow = 10
+    return settings
+
+
 # ---------------------------------------------------------------------------
 # Tests: module-level contribution instance
 # ---------------------------------------------------------------------------
@@ -208,6 +218,7 @@ class TestProjectionRunnerLifespan:
             pass
 
     @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -216,24 +227,28 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """Single app + single projection -> one runner started then stopped."""
         mock_proj.return_value = [_StubProjection]
         mock_group.return_value = {_StubApplication: [_StubProjection]}
         mock_runner = MagicMock()
         mock_runner_cls.return_value = mock_runner
+        mock_settings_cls.return_value = _mock_settings()
 
         async with projection_runner_lifespan(MagicMock()):
-            mock_runner_cls.assert_called_once_with(
-                projections=[_StubProjection],
-                upstream_application=_StubApplication,
-            )
+            mock_runner_cls.assert_called_once()
+            call_kwargs = mock_runner_cls.call_args.kwargs
+            assert call_kwargs["projections"] == [_StubProjection]
+            assert call_kwargs["upstream_application"] is _StubApplication
+            assert "env" in call_kwargs
             mock_runner.start.assert_called_once()
             mock_runner.stop.assert_not_called()
 
         mock_runner.stop.assert_called_once()
 
     @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -242,6 +257,7 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """Multiple applications -> one runner per application."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
@@ -251,6 +267,7 @@ class TestProjectionRunnerLifespan:
         }
         mock_runners = [MagicMock(), MagicMock()]
         mock_runner_cls.side_effect = mock_runners
+        mock_settings_cls.return_value = _mock_settings()
 
         async with projection_runner_lifespan(MagicMock()):
             assert mock_runner_cls.call_count == 2
@@ -261,6 +278,7 @@ class TestProjectionRunnerLifespan:
             runner.stop.assert_called_once()
 
     @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -269,6 +287,7 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """Each runner receives only its application's projections."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
@@ -277,25 +296,17 @@ class TestProjectionRunnerLifespan:
             _AnotherApplication: [_AnotherProjection],
         }
         mock_runner_cls.return_value = MagicMock()
+        mock_settings_cls.return_value = _mock_settings()
 
         async with projection_runner_lifespan(MagicMock()):
             calls = mock_runner_cls.call_args_list
-            assert calls[0] == (
-                (),
-                {
-                    "projections": [_StubProjection],
-                    "upstream_application": _StubApplication,
-                },
-            )
-            assert calls[1] == (
-                (),
-                {
-                    "projections": [_AnotherProjection],
-                    "upstream_application": _AnotherApplication,
-                },
-            )
+            assert calls[0].kwargs["projections"] == [_StubProjection]
+            assert calls[0].kwargs["upstream_application"] is _StubApplication
+            assert calls[1].kwargs["projections"] == [_AnotherProjection]
+            assert calls[1].kwargs["upstream_application"] is _AnotherApplication
 
     @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -304,6 +315,7 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """If runner.start() raises, the exception propagates."""
         mock_proj.return_value = [_StubProjection]
@@ -311,12 +323,14 @@ class TestProjectionRunnerLifespan:
         mock_runner = MagicMock()
         mock_runner.start.side_effect = RuntimeError("start failed")
         mock_runner_cls.return_value = mock_runner
+        mock_settings_cls.return_value = _mock_settings()
 
         with pytest.raises(RuntimeError, match="start failed"):
             async with projection_runner_lifespan(MagicMock()):
                 pass  # pragma: no cover
 
     @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -325,12 +339,14 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """Runners are stopped even if an exception occurs during yield."""
         mock_proj.return_value = [_StubProjection]
         mock_group.return_value = {_StubApplication: [_StubProjection]}
         mock_runner = MagicMock()
         mock_runner_cls.return_value = mock_runner
+        mock_settings_cls.return_value = _mock_settings()
 
         with pytest.raises(ValueError, match="app error"):
             async with projection_runner_lifespan(MagicMock()):
@@ -340,6 +356,7 @@ class TestProjectionRunnerLifespan:
 
     @pytest.mark.asyncio
     @patch.dict("os.environ", {"MAX_PROJECTION_RUNNERS": "1"})
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -348,6 +365,7 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """When MAX_PROJECTION_RUNNERS=1, only one projection runner starts."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
@@ -357,6 +375,7 @@ class TestProjectionRunnerLifespan:
         }
         mock_runner = MagicMock()
         mock_runner_cls.return_value = mock_runner
+        mock_settings_cls.return_value = _mock_settings()
 
         async with projection_runner_lifespan(MagicMock()):
             # Only 1 runner should be created due to cap
@@ -365,6 +384,7 @@ class TestProjectionRunnerLifespan:
         mock_runner.stop.assert_called_once()
 
     @pytest.mark.asyncio
+    @patch("praecepta.infra.eventsourcing.projection_lifespan.EventSourcingSettings")
     @patch("praecepta.infra.eventsourcing.projection_lifespan.SubscriptionProjectionRunner")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._group_projections_by_application")
     @patch("praecepta.infra.eventsourcing.projection_lifespan._discover_projections")
@@ -373,6 +393,7 @@ class TestProjectionRunnerLifespan:
         mock_proj: MagicMock,
         mock_group: MagicMock,
         mock_runner_cls: MagicMock,
+        mock_settings_cls: MagicMock,
     ) -> None:
         """If second runner.start() fails, first runner is still stopped."""
         mock_proj.return_value = [_StubProjection, _AnotherProjection]
@@ -385,6 +406,7 @@ class TestProjectionRunnerLifespan:
         runner_fail = MagicMock()
         runner_fail.start.side_effect = RuntimeError("db connection failed")
         mock_runner_cls.side_effect = [runner_ok, runner_fail]
+        mock_settings_cls.return_value = _mock_settings()
 
         with pytest.raises(RuntimeError, match="db connection failed"):
             async with projection_runner_lifespan(MagicMock()):

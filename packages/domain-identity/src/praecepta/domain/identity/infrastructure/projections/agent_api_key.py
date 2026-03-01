@@ -6,18 +6,16 @@ Maintains the agent_api_key_registry projection table via UPSERT pattern.
 
 from __future__ import annotations
 
-from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, ClassVar
+
+from eventsourcing.dispatch import singledispatchmethod
 
 from praecepta.domain.identity.agent_app import AgentApplication
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
-    from eventsourcing.application import ProcessingEvent
     from eventsourcing.domain import DomainEvent
-    from eventsourcing.utils import EnvType
+    from eventsourcing.persistence import Tracking, TrackingRecorder
 
     from praecepta.domain.identity.infrastructure.agent_api_key_repository import (
         AgentAPIKeyRepository,
@@ -40,10 +38,10 @@ class AgentAPIKeyProjection(BaseProjection):
 
     def __init__(
         self,
+        view: TrackingRecorder,
         repository: AgentAPIKeyRepository | None = None,
-        env: EnvType | None = None,
     ) -> None:
-        super().__init__(env=env)
+        super().__init__(view=view)
         if repository is None:
             from praecepta.domain.identity.infrastructure.agent_api_key_repository import (
                 AgentAPIKeyRepository as _AgentAPIKeyRepository,
@@ -54,10 +52,10 @@ class AgentAPIKeyProjection(BaseProjection):
         self._repo = repository
 
     @singledispatchmethod
-    def policy(
+    def process_event(
         self,
         domain_event: DomainEvent,
-        processing_event: ProcessingEvent[UUID],
+        tracking: Tracking,
     ) -> None:
         """Route events by class name."""
         event_name = domain_event.__class__.__name__
@@ -65,6 +63,7 @@ class AgentAPIKeyProjection(BaseProjection):
             self._handle_issued(domain_event)
         elif event_name == "APIKeyRotated":
             self._handle_rotated(domain_event)
+        self.view.insert_tracking(tracking)
 
     def _handle_issued(self, event: DomainEvent) -> None:
         """UPSERT API key on issuance."""

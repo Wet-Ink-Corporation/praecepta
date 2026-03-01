@@ -3,11 +3,11 @@
 Discovers projection classes from entry points, groups them by their
 declared ``upstream_application``, and creates
 ``SubscriptionProjectionRunner`` instances that use the eventsourcing
-library's ``EventSourcedProjectionRunner`` for LISTEN/NOTIFY-based
-event delivery.
+library's ``ProjectionRunner`` for LISTEN/NOTIFY-based event delivery.
 
-Each runner creates ONE upstream application instance and subscribes
-to its recorder for near-instant event processing.
+Each runner creates one upstream application instance and a lightweight
+``TrackingRecorder`` view per projection — no per-projection event store
+or ``ProcessRecorder`` is created.
 
 Priority 200 ensures projections start AFTER the event store (priority 100)
 is initialised, since projections depend on the event store infrastructure.
@@ -26,6 +26,7 @@ from praecepta.infra.eventsourcing.projections.base import BaseProjection
 from praecepta.infra.eventsourcing.projections.subscription_runner import (
     SubscriptionProjectionRunner,
 )
+from praecepta.infra.eventsourcing.settings import EventSourcingSettings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -85,6 +86,58 @@ def _group_projections_by_application(
     return dict(grouped)
 
 
+def _build_projection_env(settings: EventSourcingSettings) -> dict[str, str]:
+    """Build environment variables for projection runners.
+
+    Uses smaller pool sizes for projection contexts since upstream apps
+    only read events and tracking recorders only write position updates.
+    """
+    return {
+        "POSTGRES_POOL_SIZE": str(settings.postgres_projection_pool_size),
+        "POSTGRES_MAX_OVERFLOW": str(settings.postgres_projection_max_overflow),
+    }
+
+
+def _log_connection_budget(
+    grouped: dict[type[Any], list[type[BaseProjection]]],
+    settings: EventSourcingSettings,
+) -> None:
+    """Log estimated connection pool usage and warn if over budget."""
+    num_app_classes = len(grouped)
+    num_projections = sum(len(ps) for ps in grouped.values())
+
+    api_pool_max = settings.postgres_pool_size + settings.postgres_max_overflow
+    proj_pool_max = (
+        settings.postgres_projection_pool_size + settings.postgres_projection_max_overflow
+    )
+
+    # Each projection runner creates: 1 upstream app + 1 tracking recorder
+    # Both use the projection pool sizes
+    projection_conn = num_projections * 2 * proj_pool_max
+    api_conn = num_app_classes * api_pool_max
+    total = api_conn + projection_conn
+
+    logger.info(
+        "Connection pool budget: %d API app(s) (%d max conn) + "
+        "%d projection(s) x 2 pools (%d max conn) = %d estimated total",
+        num_app_classes,
+        api_conn,
+        num_projections,
+        projection_conn,
+        total,
+    )
+
+    postgres_max = int(os.getenv("POSTGRES_MAX_CONNECTIONS", "100"))
+    if total > postgres_max:
+        logger.warning(
+            "Estimated max connections (%d) exceeds POSTGRES_MAX_CONNECTIONS (%d). "
+            "Consider reducing POSTGRES_PROJECTION_POOL_SIZE / POSTGRES_PROJECTION_MAX_OVERFLOW "
+            "or increasing POSTGRES_MAX_CONNECTIONS.",
+            total,
+            postgres_max,
+        )
+
+
 @asynccontextmanager
 async def projection_runner_lifespan(app: Any) -> AsyncIterator[None]:
     """Start projection runners at startup, stop at shutdown.
@@ -139,6 +192,13 @@ async def projection_runner_lifespan(app: Any) -> AsyncIterator[None]:
         grouped = capped
         total_projections = count
 
+    # Build projection-specific env with smaller pool sizes
+    settings = EventSourcingSettings()  # type: ignore[call-arg]
+    projection_env = _build_projection_env(settings)
+
+    # Log connection budget estimate
+    _log_connection_budget(grouped, settings)
+
     logger.info(
         "Starting projection runners: %d application(s), %d projection(s)",
         len(grouped),
@@ -151,6 +211,7 @@ async def projection_runner_lifespan(app: Any) -> AsyncIterator[None]:
             runner = SubscriptionProjectionRunner(
                 projections=app_projections,
                 upstream_application=app_cls,
+                env=projection_env,
             )
             runner.start()
             runners.append(runner)

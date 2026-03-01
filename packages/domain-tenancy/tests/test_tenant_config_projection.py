@@ -50,15 +50,16 @@ class TestTenantConfigProjectionTopics:
 
 @pytest.mark.unit
 class TestTenantConfigProjectionPolicy:
-    """Event handling via policy method."""
+    """Event handling via process_event method."""
 
     def test_upserts_on_config_updated(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantConfigProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantConfigProjection(view=mock_view, repository=mock_repo)
         event = _make_config_updated_event()
-        mock_processing = MagicMock()
+        mock_tracking = MagicMock()
 
-        projection.policy(event, mock_processing)
+        projection.process_event(event, mock_tracking)
 
         mock_repo.upsert.assert_called_once_with(
             tenant_id="acme-corp",
@@ -71,28 +72,31 @@ class TestTenantConfigProjectionPolicy:
         mock_repo = MagicMock()
         mock_cache = MagicMock()
         mock_cache.cache_key.return_value = "acme-corp:feature.dark_mode"
-        projection = TenantConfigProjection(repository=mock_repo, cache=mock_cache)
+        mock_view = MagicMock()
+        projection = TenantConfigProjection(view=mock_view, repository=mock_repo, cache=mock_cache)
         event = _make_config_updated_event()
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
 
         mock_cache.cache_key.assert_called_once_with("acme-corp", "feature.dark_mode")
         mock_cache.delete.assert_called_once_with("acme-corp:feature.dark_mode")
 
     def test_no_cache_invalidation_when_cache_is_none(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantConfigProjection(repository=mock_repo, cache=None)
+        mock_view = MagicMock()
+        projection = TenantConfigProjection(view=mock_view, repository=mock_repo, cache=None)
         event = _make_config_updated_event()
 
         # Should not raise
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
         mock_repo.upsert.assert_called_once()
 
     def test_ignores_non_config_updated_events(self) -> None:
         mock_repo = MagicMock()
-        projection = TenantConfigProjection(repository=mock_repo)
+        mock_view = MagicMock()
+        projection = TenantConfigProjection(view=mock_view, repository=mock_repo)
         event = MagicMock()
         event.__class__.__name__ = "Activated"
 
-        projection.policy(event, MagicMock())
+        projection.process_event(event, MagicMock())
         mock_repo.upsert.assert_not_called()

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from praecepta.infra.eventsourcing.projections.base import BaseProjection
 from praecepta.infra.eventsourcing.projections.rebuilder import ProjectionRebuilder
-from praecepta.infra.eventsourcing.projections.runner import ProjectionRunner
 
 
 @pytest.mark.unit
@@ -17,15 +16,11 @@ class TestBaseProjectionContract:
 
     def test_cannot_instantiate_without_clear_read_model(self) -> None:
         """BaseProjection requires clear_read_model() implementation."""
-        # BaseProjection is abstract, so we verify it has the abstract method
         assert hasattr(BaseProjection, "clear_read_model")
         assert getattr(BaseProjection.clear_read_model, "__isabstractmethod__", False)
 
-    def test_has_policy_method(self) -> None:
-        assert hasattr(BaseProjection, "policy")
-
-    def test_has_get_projection_name(self) -> None:
-        assert hasattr(BaseProjection, "get_projection_name")
+    def test_has_process_event_method(self) -> None:
+        assert hasattr(BaseProjection, "process_event")
 
     def test_has_upstream_application_attribute(self) -> None:
         assert hasattr(BaseProjection, "upstream_application")
@@ -33,86 +28,30 @@ class TestBaseProjectionContract:
     def test_upstream_application_defaults_to_none(self) -> None:
         assert BaseProjection.upstream_application is None
 
+    def test_default_process_event_tracks_position(self) -> None:
+        """Default process_event ignores unknown events but tracks position."""
 
-@pytest.mark.unit
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-class TestProjectionRunner:
-    """Tests for ProjectionRunner lifecycle (deprecated, use ProjectionPoller)."""
+        class ConcreteProjection(BaseProjection):
+            def clear_read_model(self) -> None:
+                pass
 
-    def test_not_running_initially(self) -> None:
-        runner = ProjectionRunner(
-            projections=[],
-            upstream_application=MagicMock,
-        )
-        assert not runner.is_running
+        mock_view = MagicMock()
+        proj = ConcreteProjection(view=mock_view)
+        mock_event = MagicMock()
+        mock_tracking = MagicMock()
 
-    def test_emits_deprecation_warning(self) -> None:
-        with pytest.warns(DeprecationWarning, match="ProjectionPoller"):
-            ProjectionRunner(
-                projections=[],
-                upstream_application=MagicMock,
-            )
+        proj.process_event(mock_event, mock_tracking)
 
-    def test_get_raises_when_not_started(self) -> None:
-        runner = ProjectionRunner(
-            projections=[],
-            upstream_application=MagicMock,
-        )
-        with pytest.raises(RuntimeError, match="not started"):
-            runner.get(MagicMock)
+        mock_view.insert_tracking.assert_called_once_with(mock_tracking)
 
-    def test_stop_when_not_started_does_not_raise(self) -> None:
-        runner = ProjectionRunner(
-            projections=[],
-            upstream_application=MagicMock,
-        )
-        # Should not raise
-        runner.stop()
+    def test_name_defaults_to_class_name(self) -> None:
+        """Projection name should default to class name via __init_subclass__."""
 
-    @patch("praecepta.infra.eventsourcing.projections.runner.SingleThreadedRunner", create=True)
-    @patch("praecepta.infra.eventsourcing.projections.runner.System", create=True)
-    def test_start_sets_running(
-        self, mock_system_cls: MagicMock, mock_runner_cls: MagicMock
-    ) -> None:
-        # We need to mock the imports inside start()
-        with (
-            patch(
-                "praecepta.infra.eventsourcing.projections.runner.SingleThreadedRunner",
-                create=True,
-            ),
-            patch(
-                "praecepta.infra.eventsourcing.projections.runner.System",
-                create=True,
-            ),
-        ):
-            # Since start() imports from eventsourcing.system, we mock that
-            mock_system = MagicMock()
-            mock_runner = MagicMock()
+        class MyCustomProjection(BaseProjection):
+            def clear_read_model(self) -> None:
+                pass
 
-            with patch.dict(
-                "sys.modules",
-                {
-                    "eventsourcing.system": MagicMock(
-                        System=lambda pipes: mock_system,
-                        SingleThreadedRunner=lambda system, env: mock_runner,
-                    )
-                },
-            ):
-                runner = ProjectionRunner(
-                    projections=[],
-                    upstream_application=MagicMock,
-                )
-                runner.start()
-                assert runner.is_running
-
-    def test_start_twice_raises(self) -> None:
-        runner = ProjectionRunner(
-            projections=[],
-            upstream_application=MagicMock,
-        )
-        runner._started = True  # Simulate already started
-        with pytest.raises(RuntimeError, match="already started"):
-            runner.start()
+        assert MyCustomProjection.name == "MyCustomProjection"
 
 
 @pytest.mark.unit

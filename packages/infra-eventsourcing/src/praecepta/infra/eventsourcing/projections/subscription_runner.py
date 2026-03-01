@@ -1,12 +1,19 @@
 """Subscription-based projection runner using LISTEN/NOTIFY.
 
-Replaces the polling-based ``ProjectionPoller`` with the eventsourcing
-library's ``EventSourcedProjectionRunner``, which:
+Uses the eventsourcing library's ``ProjectionRunner`` (for lightweight
+``Projection`` subclasses) rather than ``EventSourcedProjectionRunner``
+(which targets ``ProcessApplication`` subclasses with their own event
+stores and connection pools).
 
-- Creates ONE upstream application instance per projection (not N+1)
+Each ``ProjectionRunner``:
+
+- Creates ONE upstream application instance per projection
+- Constructs a ``TrackingRecorder`` view for position tracking
 - Uses PostgreSQL LISTEN/NOTIFY for near-instant event delivery
-- Processes events in a dedicated background thread per projection
-- Tracks position via the projection's own ProcessRecorder
+- Processes events in a dedicated background thread
+
+The ``SubscriptionProjectionRunner`` groups projections by upstream
+application and manages their lifecycle as a unit.
 
 Example::
 
@@ -25,7 +32,7 @@ Example::
     runner.stop()
 
 See Also:
-    - :class:`eventsourcing.projection.EventSourcedProjectionRunner`
+    - :class:`eventsourcing.projection.ProjectionRunner`
     - :class:`praecepta.infra.eventsourcing.projections.base.BaseProjection`
 """
 
@@ -35,25 +42,26 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from eventsourcing.projection import EventSourcedProjectionRunner
+    from eventsourcing.projection import ProjectionRunner
     from praecepta.infra.eventsourcing.projections.base import BaseProjection
 
 logger = logging.getLogger(__name__)
 
 
 class SubscriptionProjectionRunner:
-    """Manages one ``EventSourcedProjectionRunner`` per projection.
+    """Manages one ``ProjectionRunner`` per projection.
 
     Groups projections that follow the same upstream application and
     manages their lifecycle as a unit.  Each projection gets its own
-    runner with a single upstream application instance and a dedicated
-    LISTEN/NOTIFY subscription thread.
+    runner with its own upstream application instance, a
+    ``TrackingRecorder`` view, and a dedicated LISTEN/NOTIFY
+    subscription thread.
 
     Attributes:
         _projections: Projection classes to run.
         _upstream_application: Application class that produces events.
         _env: Optional environment variables for eventsourcing config.
-        _runners: Active ``EventSourcedProjectionRunner`` instances.
+        _runners: Active ``ProjectionRunner`` instances.
         _started: Whether the runner group is currently active.
     """
 
@@ -76,14 +84,17 @@ class SubscriptionProjectionRunner:
         self._projections = projections
         self._upstream_application = upstream_application
         self._env = env
-        self._runners: list[EventSourcedProjectionRunner[Any, Any]] = []
+        self._runners: list[ProjectionRunner[Any, Any]] = []
         self._started = False
 
     def start(self) -> None:
-        """Start a subscription runner for each projection.
+        """Start a projection runner for each projection.
 
-        Each runner creates ONE upstream application instance and
+        Each runner creates one upstream application instance and
         subscribes to its recorder via LISTEN/NOTIFY (PostgreSQL).
+        Uses the lightweight ``ProjectionRunner`` with a
+        ``PostgresTrackingRecorder`` view — no per-projection event
+        store or ``ProcessRecorder`` is created.
 
         Raises:
             RuntimeError: If the runner group is already started.
@@ -98,13 +109,15 @@ class SubscriptionProjectionRunner:
             len(self._projections),
         )
 
-        from eventsourcing.projection import EventSourcedProjectionRunner
+        from eventsourcing.postgres import PostgresTrackingRecorder
+        from eventsourcing.projection import ProjectionRunner as _ProjectionRunner
 
         for proj_cls in self._projections:
             logger.info("  - %s (topics: %s)", proj_cls.__name__, proj_cls.topics or "all")
-            runner: EventSourcedProjectionRunner[Any, Any] = EventSourcedProjectionRunner(
+            runner: _ProjectionRunner[Any, Any] = _ProjectionRunner(
                 application_class=self._upstream_application,
                 projection_class=proj_cls,
+                view_class=PostgresTrackingRecorder,
                 env=self._env,
             )
             # __enter__ activates the subscription and starts processing
