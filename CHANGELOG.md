@@ -1,3 +1,9 @@
+## v2.0.1 (2026-03-01)
+
+### Fix
+
+- **infra-es**: add health monitor to surface silent projection thread failures
+
 ## v2.0.0 (2026-02-28)
 
 ### BREAKING CHANGE
