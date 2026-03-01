@@ -1,3 +1,15 @@
+## v2.0.0 (2026-02-28)
+
+### BREAKING CHANGE
+
+- BaseProjection.policy() is renamed to process_event(). Projection
+constructors now require a view parameter. ProjectionRunner and ProjectionPoller
+classes are removed — use SubscriptionProjectionRunner instead.
+
+### Fix
+
+- migrate projections from ProcessApplication to Projection to fix connection pool exhaustion
+
 ## v1.0.0 (2026-02-23)
 
 ### BREAKING CHANGE

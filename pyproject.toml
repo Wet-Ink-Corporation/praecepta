@@ -1,6 +1,6 @@
 [project]
 name = "praecepta"
-version = "1.0.0"
+version = "2.0.0"
 description = "Composable Python framework for DDD/ES multi-tenant applications"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -222,7 +222,7 @@ layers = [
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.0.0"
+version = "2.0.0"
 tag_format = "v$version"
 update_changelog_on_bump = true
 changelog_start_rev = "v0.1.0"
