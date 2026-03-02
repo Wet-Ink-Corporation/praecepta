@@ -38,6 +38,7 @@ nav:
     - Infra Auth: reference/infra-auth.md
     - Infra Persistence: reference/infra-persistence.md
     - Infra Observability: reference/infra-observability.md
+    - Infra Code Intelligence: reference/infra-codeintel.md
     - Domain Tenancy: reference/domain-tenancy.md
     - Domain Identity: reference/domain-identity.md
   - Decisions: decisions.md
@@ -57,6 +58,7 @@ plugins:
             - packages/infra-auth/src
             - packages/infra-persistence/src
             - packages/infra-observability/src
+            - packages/infra-codeintel/src
             - packages/domain-tenancy/src
             - packages/domain-identity/src
           options:
@@ -98,6 +100,7 @@ plugins:
           - reference/infra-auth.md
           - reference/infra-persistence.md
           - reference/infra-observability.md
+          - reference/infra-codeintel.md
           - reference/domain-tenancy.md
           - reference/domain-identity.md
         Decisions:

@@ -22,6 +22,7 @@ Praecepta is a uv workspaces monorepo. All packages live under `packages/` and s
 | `praecepta-infra-auth` | `praecepta.infra.auth` | JWT/JWKS, API key auth, PKCE, OIDC, dev bypass |
 | `praecepta-infra-persistence` | `praecepta.infra.persistence` | PostgreSQL sessions, Redis, Row-Level Security helpers |
 | `praecepta-infra-observability` | `praecepta.infra.observability` | Structured logging, distributed tracing, health checks |
+| `praecepta-infra-codeintel` | `praecepta.infra.codeintel` | Code intelligence: tree-sitter parsing, semantic search, structural ranking, context assembly for AI agents |
 | `praecepta-infra-taskiq` | `praecepta.infra.taskiq` | Background task queue integration |
 
 ### Layer 2: Domain
@@ -72,6 +73,15 @@ from praecepta.foundation.application import (
     ErrorHandlerContribution, DiscoveredContribution,
     # Discovery
     discover,
+)
+```
+
+### `praecepta.infra.codeintel`
+
+```python
+from praecepta.infra.codeintel import (
+    ContextAssembler, ContextQuery, ContextResponse,
+    QueryIntent, CodeIntelSettings, get_settings,
 )
 ```
 
