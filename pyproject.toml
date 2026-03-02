@@ -27,6 +27,7 @@ dependencies = [
     "praecepta-domain-tenancy",
     "praecepta-domain-identity",
     "praecepta-integration-tenancy-identity",
+    "praecepta-infra-codeintel",
 ]
 
 # =============================================================================
@@ -51,6 +52,7 @@ praecepta-infra-taskiq = { workspace = true }
 praecepta-domain-tenancy = { workspace = true }
 praecepta-domain-identity = { workspace = true }
 praecepta-integration-tenancy-identity = { workspace = true }
+praecepta-infra-codeintel = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -157,7 +159,7 @@ exclude_lines = [
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = "packages/foundation-domain/src:packages/foundation-application/src:packages/infra-fastapi/src:packages/infra-eventsourcing/src:packages/infra-auth/src:packages/infra-persistence/src:packages/infra-observability/src:packages/infra-taskiq/src:packages/domain-tenancy/src:packages/domain-identity/src:packages/integration-tenancy-identity/src"
+mypy_path = "packages/foundation-domain/src:packages/foundation-application/src:packages/infra-fastapi/src:packages/infra-eventsourcing/src:packages/infra-auth/src:packages/infra-persistence/src:packages/infra-observability/src:packages/infra-taskiq/src:packages/domain-tenancy/src:packages/domain-identity/src:packages/integration-tenancy-identity/src:packages/infra-codeintel/src"
 packages = ["praecepta"]
 strict = true
 warn_return_any = true
@@ -240,5 +242,6 @@ version_files = [
     "packages/domain-tenancy/pyproject.toml:^version",
     "packages/domain-identity/pyproject.toml:^version",
     "packages/integration-tenancy-identity/pyproject.toml:^version",
+    "packages/infra-codeintel/pyproject.toml:^version",
     "CLAUDE.md:pre-alpha",
 ]

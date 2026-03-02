@@ -93,6 +93,7 @@ The app factory (`create_app()`) uses Python entry points for plugin-style auto-
 | praecepta-infra-taskiq | praecepta.infra.taskiq | 1 |
 | praecepta-domain-tenancy | praecepta.domain.tenancy | 2 |
 | praecepta-domain-identity | praecepta.domain.identity | 2 |
+| praecepta-infra-codeintel | praecepta.infra.codeintel | 1 |
 | praecepta-integration-tenancy-identity | praecepta.integration.tenancy_identity | 3 |
 
 ## Code Style
