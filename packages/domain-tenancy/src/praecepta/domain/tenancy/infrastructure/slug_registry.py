@@ -95,13 +95,14 @@ class SlugRegistry:
         Raises:
             ConflictError: If the slug is already reserved or confirmed.
         """
+        from eventsourcing.persistence import IntegrityError
         from psycopg.errors import UniqueViolation
 
         datastore = self._app.factory.datastore  # type: ignore[attr-defined]
         try:
             with datastore.transaction(commit=True) as cursor:
                 cursor.execute(_RESERVE_SQL, (slug,))
-        except UniqueViolation as err:
+        except (UniqueViolation, IntegrityError) as err:
             raise ConflictError(
                 f"Slug '{slug}' is already taken",
                 slug=slug,

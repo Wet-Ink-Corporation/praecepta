@@ -101,12 +101,12 @@ class AgentAPIKeyRepository:
                     UPDATE agent_api_key_registry
                     SET status = :status,
                         revoked_at = CASE
-                            WHEN :status = 'revoked' THEN CURRENT_TIMESTAMP
+                            WHEN :new_status = 'revoked' THEN CURRENT_TIMESTAMP
                             ELSE revoked_at
                         END
                     WHERE key_id = :key_id
                 """),
-                {"key_id": key_id, "status": status},
+                {"key_id": key_id, "status": status, "new_status": status},
             )
             session.commit()
 
