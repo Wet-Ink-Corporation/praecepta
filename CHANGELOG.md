@@ -1,3 +1,10 @@
+## v2.0.2 (2026-03-02)
+
+### Feat
+
+- **infra-codeintel**: add code intelligence package for AI agents
+- add integration test suite, alembic migrations, and fix SQL bugs
+
 ## v2.0.1 (2026-03-01)
 
 ### Fix
