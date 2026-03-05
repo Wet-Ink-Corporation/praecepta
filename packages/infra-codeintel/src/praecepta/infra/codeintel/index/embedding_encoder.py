@@ -25,11 +25,11 @@ class JinaEmbeddingEncoder:
         try:
             self._model = AutoModel.from_pretrained(
                 settings.embedding_model,
-                trust_remote_code=True,
+                trust_remote_code=settings.embedding_trust_remote_code,
             )
             self._tokenizer = AutoTokenizer.from_pretrained(
                 settings.embedding_model,
-                trust_remote_code=True,
+                trust_remote_code=settings.embedding_trust_remote_code,
             )
             self._model.to(settings.embedding_device)
             self._model.eval()

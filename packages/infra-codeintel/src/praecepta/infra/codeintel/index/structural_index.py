@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import pickle
 from collections import deque
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Literal
+
+logger = logging.getLogger(__name__)
+
+# Increment when the saved payload schema changes to avoid loading stale data.
+_PICKLE_VERSION = 1
 
 import networkx as nx  # type: ignore[import-untyped]
 
@@ -275,6 +281,7 @@ class NetworkXStructuralIndex:
         with path.open("wb") as f:
             pickle.dump(
                 {
+                    "version": _PICKLE_VERSION,
                     "graph": self._graph,
                     "definition_index": self._definition_index,
                 },
@@ -282,16 +289,31 @@ class NetworkXStructuralIndex:
             )
 
     def load(self) -> None:
-        """Restore the graph and definition index from *cache_dir*/graph.pkl."""
+        """Restore the graph and definition index from *cache_dir*/graph.pkl.
+
+        If the saved file has a mismatched version marker the file is ignored
+        and the index starts empty (a fresh re-index will rebuild it).
+        """
         if self._cache_dir is None:
             return
         path = self._cache_dir / "graph.pkl"
         if not path.exists():
             return
         with path.open("rb") as f:
-            data = pickle.load(f)
-            self._graph = data["graph"]
-            self._definition_index = data["definition_index"]
+            data: dict[str, object] = pickle.load(f)
+
+        if data.get("version") != _PICKLE_VERSION:
+            logger.warning(
+                "structural index: graph.pkl version mismatch "
+                "(expected %d, got %s) — discarding stale index; "
+                "a full re-index will rebuild it",
+                _PICKLE_VERSION,
+                data.get("version"),
+            )
+            return
+
+        self._graph = data["graph"]  # networkx untyped; mypy treats nx.DiGraph as Any
+        self._definition_index = data["definition_index"]  # type: ignore[assignment]
         self._invalidate_pagerank()
 
     # ------------------------------------------------------------------

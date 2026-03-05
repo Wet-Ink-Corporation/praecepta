@@ -97,7 +97,7 @@ class WatchdogFileWatcher:
     ) -> None:
         """Begin watching repo_root recursively."""
         settings = get_settings()
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         handler = _DebouncedHandler(
             callback=on_change,

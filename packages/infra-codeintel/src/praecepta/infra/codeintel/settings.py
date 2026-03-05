@@ -45,6 +45,15 @@ class CodeIntelSettings(BaseSettings):
         default="cpu",
         description="Device for embedding model (cpu, cuda, mps)",
     )
+    embedding_trust_remote_code: bool = Field(
+        default=True,
+        description=(
+            "Allow execution of remote code when loading the embedding model. "
+            "Required for Jina models (default True). Set to False only when using "
+            "models that do not require it. "
+            "WARNING: only disable if you fully trust the model source."
+        ),
+    )
     embedding_batch_size: int = Field(
         default=64,
         ge=1,

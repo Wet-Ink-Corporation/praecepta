@@ -104,6 +104,9 @@ class StubSemanticIndex:
     async def search_by_name(self, symbol_name: str, top_k: int = 10) -> list[str]:
         return []
 
+    async def get_symbol_record(self, qualified_name: str) -> SymbolSignature | None:
+        return None
+
 
 class StubContextAssembler:
     async def query(self, query: Any) -> Any:

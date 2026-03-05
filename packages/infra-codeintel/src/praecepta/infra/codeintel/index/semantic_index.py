@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import lancedb  # type: ignore[import-untyped]
 import pyarrow as pa  # type: ignore[import-untyped]
 
 from praecepta.infra.codeintel.settings import get_settings
+from praecepta.infra.codeintel.types import SymbolSignature
 
-if TYPE_CHECKING:
-    from praecepta.infra.codeintel.types import SymbolSignature
+logger = logging.getLogger(__name__)
 
 TABLE_NAME = "symbols"
 
@@ -33,6 +35,14 @@ SCHEMA = pa.schema(
         pa.field("last_modified", pa.timestamp("us", tz="UTC")),
     ]
 )
+
+
+def _sql_str(value: str) -> str:
+    """Escape a string value for use in LanceDB SQL-like filter expressions.
+
+    Replaces single quotes with doubled single quotes (standard SQL escaping).
+    """
+    return value.replace("'", "''")
 
 
 class LanceDBSemanticIndex:
@@ -85,8 +95,7 @@ class LanceDBSemanticIndex:
         # Delete existing records with same qualified_names, then add
         names = [r["qualified_name"] for r in records]
         try:
-            # Build SQL-safe IN clause
-            escaped = ", ".join(f"'{n}'" for n in names)
+            escaped = ", ".join(f"'{_sql_str(n)}'" for n in names)
             self._table.delete(f"qualified_name IN ({escaped})")
         except Exception:
             pass  # table may be empty or no matching rows
@@ -96,7 +105,7 @@ class LanceDBSemanticIndex:
     async def remove_symbols(self, qualified_names: list[str]) -> int:
         if not qualified_names:
             return 0
-        escaped = ", ".join(f"'{n}'" for n in qualified_names)
+        escaped = ", ".join(f"'{_sql_str(n)}'" for n in qualified_names)
         self._table.delete(f"qualified_name IN ({escaped})")
         return len(qualified_names)
 
@@ -113,15 +122,68 @@ class LanceDBSemanticIndex:
         search = self._table.search(query_vec).limit(top_k)
 
         if filters:
-            where_clauses = [f"{k} = '{v}'" for k, v in filters.items()]
+            where_clauses = [f"{k} = '{_sql_str(v)}'" for k, v in filters.items()]
             search = search.where(" AND ".join(where_clauses))
 
         results = search.to_list()
         return [(r["qualified_name"], float(r.get("_distance", 0.0))) for r in results]
 
     async def search_by_name(self, symbol_name: str, top_k: int = 10) -> list[str]:
-        results = self._table.search().where(f"name = '{symbol_name}'").limit(top_k).to_list()
+        """Search for symbols by short name.
+
+        Performs a full table scan — efficient for small corpora; for large
+        repos (>50k symbols) consider adding a scalar index on the name column.
+        """
+        row_count: int = self._table.count_rows()
+        if row_count > 50_000:
+            logger.warning(
+                "search_by_name: full table scan on %d rows "
+                "(consider a scalar index for large repos)",
+                row_count,
+            )
+        results = (
+            self._table.search()
+            .where(f"name = '{_sql_str(symbol_name)}'")
+            .limit(top_k)
+            .to_list()
+        )
         return [r["qualified_name"] for r in results]
+
+    async def get_symbol_record(self, qualified_name: str) -> SymbolSignature | None:
+        """Return full symbol metadata for a given qualified name, or None if not found."""
+        results = (
+            self._table.search()
+            .where(f"qualified_name = '{_sql_str(qualified_name)}'")
+            .limit(1)
+            .to_list()
+        )
+        if not results:
+            return None
+        r = results[0]
+        # last_modified may be a pandas Timestamp or datetime; normalise to datetime
+        raw_ts = r["last_modified"]
+        if hasattr(raw_ts, "to_pydatetime"):
+            last_modified: datetime = raw_ts.to_pydatetime().replace(tzinfo=UTC)
+        elif isinstance(raw_ts, datetime):
+            last_modified = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=UTC)
+        else:
+            last_modified = datetime.now(tz=UTC)
+
+        return SymbolSignature(
+            qualified_name=r["qualified_name"],
+            name=r["name"],
+            kind=r["kind"],
+            language=r["language"],
+            file_path=r["file_path"],
+            start_line=int(r["start_line"]),
+            end_line=int(r["end_line"]),
+            signature=r["signature"],
+            docstring=r["docstring"] or None,
+            parent_symbol=r["parent_symbol"] or None,
+            embedding_text=r["embedding_text"],
+            token_count_estimate=int(r["token_count_estimate"]),
+            last_modified=last_modified,
+        )
 
     def compact(self) -> None:
         self._table.compact_files()
