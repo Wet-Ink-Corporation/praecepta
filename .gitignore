@@ -50,3 +50,7 @@ docs/site/
 .env
 .env.*
 !.env.example
+
+# Development / Working directories
+.letta/
+_workspace/
