@@ -82,19 +82,49 @@ The code intelligence pipeline follows five stages:
 
 4. **Assemble** — `ContextAssembler` fuses results from both indexes. Fusion weights are driven by `QueryIntent` (e.g. `MODIFY` favours structural neighbors, `UNDERSTAND` favours semantic similarity). Results are packed into a token budget with signature-only overflow for lower-ranked symbols.
 
-5. **Surface** — Five MCP tools expose the pipeline to AI agents. A CLI (`code-intel serve|index|stats`) provides operational access.
+5. **Surface** — Five MCP tools expose the pipeline to AI agents via a `FastMCP` server. A CLI (`code-intel serve|index|stats`) provides operational access. When started via `code-intel serve`, a `WatchdogFileWatcher` + `IncrementalUpdatePipeline` are wired through the server's `lifespan` hook so the indexes stay current as files change.
+
+## CLI
+
+```bash
+# Start MCP server (stdio — default, for Claude Desktop / CLI clients)
+code-intel serve --repo /path/to/repo
+
+# Start MCP server (streamable-http — for remote / multi-client deployments)
+code-intel serve --repo /path/to/repo --transport streamable-http --host 0.0.0.0 --port 8420
+
+# One-shot full index
+code-intel index --repo /path/to/repo
+
+# Include test files in index
+code-intel index --repo /path/to/repo --include-tests
+
+# Print index statistics
+code-intel stats --repo /path/to/repo
+
+# Print stats as JSON
+code-intel stats --repo /path/to/repo --json
+```
 
 ## Configuration
 
-`CodeIntelSettings` reads from environment variables with the `CODE_INTEL_` prefix:
+`CodeIntelSettings` reads from environment variables with the `CODE_INTEL_` prefix (default values shown):
 
-| Variable | Purpose |
-|----------|---------|
-| `CODE_INTEL_REPO_ROOT` | Root directory of the repository to index |
-| `CODE_INTEL_LANCE_URI` | LanceDB storage URI |
-| `CODE_INTEL_EMBEDDING_MODEL` | Jina embedding model name |
-| `CODE_INTEL_TOKEN_BUDGET` | Default max tokens for context responses |
-| `CODE_INTEL_MCP_PORT` | Port for the MCP tool server |
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CODE_INTEL_REPO_ROOT` | `.` | Root directory of the repository to index |
+| `CODE_INTEL_LANGUAGES` | `python,typescript,javascript` | Languages to index |
+| `CODE_INTEL_EXCLUDE_PATTERNS` | `**/node_modules/**`, `**/dist/**`, etc. | Glob patterns excluded from indexing |
+| `CODE_INTEL_EMBEDDING_MODEL` | `jinaai/jina-code-embeddings-0.5b` | HuggingFace model ID for code embeddings |
+| `CODE_INTEL_EMBEDDING_DEVICE` | `cpu` | Device for embedding model (`cpu`, `cuda`, `mps`) |
+| `CODE_INTEL_EMBEDDING_TRUST_REMOTE_CODE` | `true` | Allow remote code execution when loading embedding model (required for Jina models) |
+| `CODE_INTEL_EMBEDDING_BATCH_SIZE` | `64` | Batch size for embedding computation |
+| `CODE_INTEL_DEFAULT_TOKEN_BUDGET` | `4096` | Default max tokens for context responses |
+| `CODE_INTEL_CACHE_DIR` | `.code-intel` | Directory for index artifacts (relative to repo root) |
+| `CODE_INTEL_WATCHER_DEBOUNCE_MS` | `300` | File watcher debounce window in milliseconds |
+| `CODE_INTEL_PAGERANK_DAMPING` | `0.85` | PageRank damping factor for structural ranking |
+| `CODE_INTEL_MAX_DEPENDENCY_DEPTH` | `3` | Maximum hops for dependency graph traversal |
+| `CODE_INTEL_LANCEDB_COMPACT_INTERVAL_MINUTES` | `30` | LanceDB compaction interval |
 
 ## API Reference
 

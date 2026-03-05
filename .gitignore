@@ -51,6 +51,9 @@ docs/site/
 .env.*
 !.env.example
 
+# Code intelligence index artifacts
+.code-intel/
+
 # Development / Working directories
 .letta/
 _workspace/
