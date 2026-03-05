@@ -8,14 +8,21 @@ Tools are exposed both as:
 
 from __future__ import annotations
 
+import logging
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.fastmcp import FastMCP
 
 from praecepta.infra.codeintel.assembly.schemas import ContextQuery
 from praecepta.infra.codeintel.types import QueryIntent
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Module-level functions (for direct testing)
@@ -98,10 +105,45 @@ async def code_index_refresh(
 # ---------------------------------------------------------------------------
 
 
+def _make_watcher_lifespan(
+    assembler: Any,
+    repo_root: Path,
+) -> Any:
+    """Return an async context manager that runs the file watcher for *assembler*.
+
+    The context manager is passed to ``FastMCP(lifespan=...)``.  It is only
+    invoked after the server's asyncio event loop is running, which satisfies
+    ``WatchdogFileWatcher.start()``'s requirement for a running loop.
+    """
+    from praecepta.infra.codeintel.watcher.file_watcher import WatchdogFileWatcher
+    from praecepta.infra.codeintel.watcher.incremental_pipeline import IncrementalUpdatePipeline
+
+    @asynccontextmanager
+    async def _lifespan(server: Any) -> AsyncIterator[None]:
+        pipeline = IncrementalUpdatePipeline(
+            parser=assembler._parser,
+            extractor=assembler._extractor,
+            structural_index=assembler._structural,
+            semantic_index=assembler._semantic,
+        )
+        watcher = WatchdogFileWatcher()
+        watcher.start(repo_root, pipeline.process_events)
+        logger.info("file watcher started (repo=%s)", repo_root)
+        try:
+            yield
+        finally:
+            watcher.stop()
+            logger.info("file watcher stopped")
+
+    return _lifespan
+
+
 def create_mcp_server(
     assembler: Any,
     host: str = "127.0.0.1",
     port: int = 8420,
+    watch: bool = False,
+    repo_root: Path | None = None,
 ) -> FastMCP:
     """Create and configure the MCP server with all tools.
 
@@ -111,13 +153,18 @@ def create_mcp_server(
               Pass "0.0.0.0" to listen on all interfaces.
         port: Bind port for network transports (default 8420).
               Ignored when using stdio transport.
+        watch: If True, start a WatchdogFileWatcher that incrementally
+               updates indexes when source files change.  Requires a
+               running asyncio loop — only set this from ``serve``.
+        repo_root: Repository root to watch.  Required when watch=True.
 
     Note on transport / host / port: ``FastMCP.run()`` accepts a *transport*
     string (``"stdio"``, ``"streamable-http"``, or legacy ``"sse"``), but host
     and port are **constructor** parameters — they cannot be passed to
     ``run()`` directly.  Always use this factory to set them.
     """
-    mcp = FastMCP("code-intel", host=host, port=port)
+    lifespan = _make_watcher_lifespan(assembler, repo_root) if watch and repo_root else None
+    mcp = FastMCP("code-intel", host=host, port=port, lifespan=lifespan)
 
     @mcp.tool()
     async def code_context_search_tool(

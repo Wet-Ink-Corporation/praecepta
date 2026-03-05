@@ -131,11 +131,14 @@ def serve(
         sys.exit(1)
 
     assembler = _build_assembler(repo, device)
+    repo_root = Path(repo).resolve()
 
     # FastMCP(name, host=..., port=...) — host/port are constructor params, NOT run() params.
     # run() only accepts: transport: Literal["stdio", "sse", "streamable-http"]
     # See: mcp.server.fastmcp.FastMCP (mcp==1.26.0)
-    server: Any = create_mcp_server(assembler, host=host, port=port)
+    server: Any = create_mcp_server(
+        assembler, host=host, port=port, watch=True, repo_root=repo_root
+    )
 
     if transport == "stdio":
         click.echo(f"Starting code-intel MCP server (transport=stdio, repo={repo})")

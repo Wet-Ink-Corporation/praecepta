@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from praecepta.infra.codeintel.assembly.schemas import ContextResponse, RepoSummary
 from praecepta.infra.codeintel.surface.mcp_tools import (
@@ -89,3 +93,57 @@ class TestMCPTools:
         )
         result = await code_index_refresh(assembler=mock_assembler)
         assert result["files_indexed"] == 5
+
+
+@pytest.mark.unit
+class TestCreateMCPServer:
+    def test_watch_false_no_lifespan(self) -> None:
+        """create_mcp_server(watch=False) must not attach a lifespan."""
+        from praecepta.infra.codeintel.surface.mcp_tools import create_mcp_server
+
+        mock_assembler = MagicMock()
+        server = create_mcp_server(mock_assembler, watch=False)
+        # FastMCP stores lifespan on settings; None means no watcher wired
+        assert server.settings.lifespan is None
+
+    def test_watch_true_attaches_lifespan(self, tmp_path: Path) -> None:
+        """create_mcp_server(watch=True, repo_root=...) must attach a lifespan callable."""
+        from praecepta.infra.codeintel.surface.mcp_tools import create_mcp_server
+
+        mock_assembler = MagicMock()
+        server = create_mcp_server(mock_assembler, watch=True, repo_root=tmp_path)
+        assert server.settings.lifespan is not None
+
+    def test_watch_true_no_repo_root_no_lifespan(self) -> None:
+        """watch=True without repo_root must silently skip watcher (no lifespan)."""
+        from praecepta.infra.codeintel.surface.mcp_tools import create_mcp_server
+
+        mock_assembler = MagicMock()
+        server = create_mcp_server(mock_assembler, watch=True, repo_root=None)
+        assert server.settings.lifespan is None
+
+    @pytest.mark.asyncio
+    async def test_lifespan_starts_and_stops_watcher(self, tmp_path: Path) -> None:
+        """The lifespan context manager must start the watcher on enter and stop on exit."""
+        from praecepta.infra.codeintel.surface.mcp_tools import _make_watcher_lifespan
+
+        mock_assembler = MagicMock()
+        mock_watcher = MagicMock()
+        mock_pipeline = MagicMock()
+
+        # The watcher classes are imported inside _lifespan via `from x import Y`,
+        # so patch at the source module where the class is defined.
+        with (
+            patch(
+                "praecepta.infra.codeintel.watcher.file_watcher.WatchdogFileWatcher",
+                return_value=mock_watcher,
+            ),
+            patch(
+                "praecepta.infra.codeintel.watcher.incremental_pipeline.IncrementalUpdatePipeline",
+                return_value=mock_pipeline,
+            ),
+        ):
+            lifespan = _make_watcher_lifespan(mock_assembler, tmp_path)
+            async with lifespan(None):
+                mock_watcher.start.assert_called_once_with(tmp_path, mock_pipeline.process_events)
+            mock_watcher.stop.assert_called_once()
