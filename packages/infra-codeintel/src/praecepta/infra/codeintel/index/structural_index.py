@@ -8,14 +8,14 @@ from collections import deque
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Literal
 
+import networkx as nx  # type: ignore[import-untyped]
+
+from praecepta.infra.codeintel.assembly.schemas import RepoSummary
+
 logger = logging.getLogger(__name__)
 
 # Increment when the saved payload schema changes to avoid loading stale data.
 _PICKLE_VERSION = 1
-
-import networkx as nx  # type: ignore[import-untyped]
-
-from praecepta.infra.codeintel.assembly.schemas import RepoSummary
 
 if TYPE_CHECKING:
     from pathlib import Path

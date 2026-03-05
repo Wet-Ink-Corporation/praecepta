@@ -107,11 +107,8 @@ class TestSemanticExtractor:
         py_file = tmp_path / "service.py"
         py_file.write_text(PYTHON_SOURCE)
 
-        parser = tslp.get_parser("python")
-        tree = parser.parse(PYTHON_SOURCE.encode())
-        extractor_obj = TreeSitterSemanticExtractor()
         # Extract with a .py file path — should get "python"
-        tags, symbols_py, _ = _parse_and_extract(PYTHON_SOURCE, filename=str(py_file))
+        _, symbols_py, _ = _parse_and_extract(PYTHON_SOURCE, filename=str(py_file))
         assert all(s.language == "python" for s in symbols_py)
 
     def test_relationship_import_classification(self) -> None:

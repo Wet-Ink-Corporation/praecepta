@@ -34,9 +34,7 @@ class TestFileWatcherIntegration:
 
             assert len(events_received) > 0
             # On Windows, watchdog may report "created" as "modified"
-            assert any(
-                e.event_type in ("created", "modified") for e in events_received
-            )
+            assert any(e.event_type in ("created", "modified") for e in events_received)
         finally:
             watcher.stop()
 

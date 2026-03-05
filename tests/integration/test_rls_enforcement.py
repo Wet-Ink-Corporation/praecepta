@@ -21,22 +21,22 @@ def rls_session_factory(postgres_url, sync_session_factory):
     """Session factory connected as a non-superuser so RLS is enforced."""
     # Create the non-superuser role (idempotent)
     with sync_session_factory() as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             DO $$
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rls_test_user') THEN
                     CREATE ROLE rls_test_user LOGIN PASSWORD 'rls_test_pass';
                 END IF;
             END $$
-        """))
+        """)
+        )
         # Grant usage on tables so the role can SELECT/INSERT
         session.execute(text("GRANT ALL ON ALL TABLES IN SCHEMA public TO rls_test_user"))
         session.commit()
 
     # Build a connection URL for the non-superuser
-    rls_url = postgres_url.replace(
-        "://test:test@", "://rls_test_user:rls_test_pass@"
-    )
+    rls_url = postgres_url.replace("://test:test@", "://rls_test_user:rls_test_pass@")
     engine = create_engine(rls_url, pool_pre_ping=True)
     factory = sessionmaker(engine, expire_on_commit=False, autoflush=False)
     yield factory
@@ -103,9 +103,7 @@ class TestRLSEnforcement:
                 text("SELECT set_config('app.current_tenant', :tenant, true)"),
                 {"tenant": "cfg-tenant-a"},
             )
-            rows = session.execute(
-                text("SELECT tenant_id FROM tenant_configuration")
-            ).fetchall()
+            rows = session.execute(text("SELECT tenant_id FROM tenant_configuration")).fetchall()
             tenant_ids = [r[0] for r in rows]
             assert tenant_ids == ["cfg-tenant-a"]
 

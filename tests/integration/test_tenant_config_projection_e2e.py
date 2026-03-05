@@ -45,7 +45,9 @@ class TestTenantConfigProjectionE2E:
         """ConfigUpdated event should UPSERT into tenant_configuration."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="cfg-proj", name="Config Proj", slug="cfg-proj", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="cfg-proj", name="Config Proj", slug="cfg-proj", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         tenant = tenant_app.repository.get(tenant.id)
@@ -70,7 +72,9 @@ class TestTenantConfigProjectionE2E:
         """Second config update to same key should overwrite."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="cfg-ow", name="Config Overwrite", slug="cfg-ow", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="cfg-ow", name="Config Overwrite", slug="cfg-ow", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         tenant = tenant_app.repository.get(tenant.id)

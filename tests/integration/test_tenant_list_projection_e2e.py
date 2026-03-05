@@ -50,7 +50,9 @@ class TestTenantListProjectionE2E:
         """Provisioned event should INSERT into tenants table."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="proj-co", name="Proj Co", slug="proj-co", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="proj-co", name="Proj Co", slug="proj-co", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         projection, repo = self._make_projection(sync_session_factory)
@@ -69,7 +71,9 @@ class TestTenantListProjectionE2E:
         """Walk through lifecycle and verify projection updates."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="life-proj", name="Life Proj", slug="life-proj", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="life-proj", name="Life Proj", slug="life-proj", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         tenant = tenant_app.repository.get(tenant.id)
@@ -96,7 +100,9 @@ class TestTenantListProjectionE2E:
         """Replaying events should produce the same read model state."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="idem-proj", name="Idem Proj", slug="idem-proj", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="idem-proj", name="Idem Proj", slug="idem-proj", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         projection, repo = self._make_projection(sync_session_factory)

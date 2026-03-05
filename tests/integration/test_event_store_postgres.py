@@ -19,7 +19,9 @@ class TestEventStorePostgres:
         # If we can save and retrieve, the tables exist
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="test-co", name="Test Co", slug="test-co", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="test-co", name="Test Co", slug="test-co", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         reloaded = tenant_app.repository.get(tenant.id)
@@ -29,7 +31,9 @@ class TestEventStorePostgres:
         """Round-trip: store domain events then read them back."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="round-trip", name="Round Trip", slug="round-trip", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="round-trip", name="Round Trip", slug="round-trip", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         # Read events from notification log
@@ -44,7 +48,13 @@ class TestEventStorePostgres:
 
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="conflict-co", name="Conflict Co", slug="conflict-co", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="conflict-co",
+            name="Conflict Co",
+            slug="conflict-co",
+            config=None,
+            metadata=None,
+        )
         tenant_app.save(tenant)
 
         # Load two copies of the same aggregate

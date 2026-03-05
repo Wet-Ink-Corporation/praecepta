@@ -34,9 +34,8 @@ def _is_test_file(fp: Path) -> bool:
     if any(p in ("tests", "test", "__tests__", "spec") for p in parts):
         return True
     name = fp.name
-    return (
-        name.startswith("test_")
-        or name.endswith(("_test.py", ".spec.ts", ".spec.js", ".test.ts", ".test.js"))
+    return name.startswith("test_") or name.endswith(
+        ("_test.py", ".spec.ts", ".spec.js", ".test.ts", ".test.js")
     )
 
 

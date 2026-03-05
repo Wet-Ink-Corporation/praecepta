@@ -32,10 +32,10 @@ async def _codeintel_lifespan(app: Any) -> AsyncIterator[None]:
         2. Serialize structural index to disk
         3. Close LanceDB connection
     """
+    from pathlib import Path
+
     from praecepta.infra.codeintel.index.structural_index import NetworkXStructuralIndex
     from praecepta.infra.codeintel.settings import get_settings
-
-    from pathlib import Path
 
     settings = get_settings()
     logger.info("codeintel_lifespan: starting up (repo=%s)", settings.repo_root)

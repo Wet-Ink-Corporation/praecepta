@@ -142,10 +142,7 @@ class LanceDBSemanticIndex:
                 row_count,
             )
         results = (
-            self._table.search()
-            .where(f"name = '{_sql_str(symbol_name)}'")
-            .limit(top_k)
-            .to_list()
+            self._table.search().where(f"name = '{_sql_str(symbol_name)}'").limit(top_k).to_list()
         )
         return [r["qualified_name"] for r in results]
 

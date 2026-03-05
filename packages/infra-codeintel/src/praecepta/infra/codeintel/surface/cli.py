@@ -81,7 +81,9 @@ def cli() -> None:
         "'sse' for legacy SSE clients only."
     ),
 )
-@click.option("--host", default="127.0.0.1", help="Bind host for network transports (default 127.0.0.1)")
+@click.option(
+    "--host", default="127.0.0.1", help="Bind host for network transports (default 127.0.0.1)"
+)
 @click.option("--port", default=8420, help="Bind port for network transports (default 8420)")
 @click.option("--device", default="cpu", help="Embedding model device (cpu/cuda/mps)")
 @click.option("--config", default=None, help="Path to code-intel.json config file")
@@ -113,7 +115,10 @@ def serve(
     settings = get_settings()
     log.info(
         "serve: repo=%s transport=%s host=%s port=%d",
-        settings.repo_root, transport, host, port,
+        settings.repo_root,
+        transport,
+        host,
+        port,
     )
 
     try:

@@ -76,16 +76,13 @@ class TagExtractor:
                 continue
 
             # Narrowed literal kind for the Tag type
-            tag_kind = cast(Literal["definition", "reference"], kind_str)
+            tag_kind = cast("Literal['definition', 'reference']", kind_str)
             # sub_kind is the third segment if present (e.g. "function", "call", "import")
             sub_kind = parts[2] if len(parts) > 2 else ""
 
             for node in nodes:
                 node_text = getattr(node, "text", b"")
-                if isinstance(node_text, bytes):
-                    name = node_text.decode("utf-8")
-                else:
-                    name = str(node_text)
+                name = node_text.decode("utf-8") if isinstance(node_text, bytes) else str(node_text)
 
                 start_point = getattr(node, "start_point", (0, 0))
                 line: int = start_point[0] + 1  # 0-indexed to 1-indexed

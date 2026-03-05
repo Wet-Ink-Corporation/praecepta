@@ -29,7 +29,9 @@ class TestTenantApplicationPostgres:
         """Walk through provision→activate→suspend→reactivate→decommission."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="lifecycle", name="Lifecycle Co", slug="lifecycle", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="lifecycle", name="Lifecycle Co", slug="lifecycle", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         # Activate
@@ -67,7 +69,9 @@ class TestTenantApplicationPostgres:
 
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="concur", name="Concurrent Co", slug="concur", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="concur", name="Concurrent Co", slug="concur", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         copy1 = tenant_app.repository.get(tenant.id)
@@ -84,7 +88,9 @@ class TestTenantApplicationPostgres:
         """After 51 events, verify the aggregate can still be loaded (snapshot path)."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="snap-co", name="Snap Co", slug="snap-co", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="snap-co", name="Snap Co", slug="snap-co", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         tenant = tenant_app.repository.get(tenant.id)
@@ -111,7 +117,9 @@ class TestTenantApplicationPostgres:
         """Activate, update config, reload, verify config persisted."""
         from praecepta.domain.tenancy.tenant import Tenant
 
-        tenant = Tenant(tenant_id="cfg-co", name="Config Co", slug="cfg-co", config=None, metadata=None)
+        tenant = Tenant(
+            tenant_id="cfg-co", name="Config Co", slug="cfg-co", config=None, metadata=None
+        )
         tenant_app.save(tenant)
 
         tenant = tenant_app.repository.get(tenant.id)

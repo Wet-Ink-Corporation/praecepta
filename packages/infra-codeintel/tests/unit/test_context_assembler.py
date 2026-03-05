@@ -325,6 +325,7 @@ class TestDefaultContextAssembler:
     def test_discover_files_respects_exclude_patterns(self, tmp_path: Path) -> None:
         """_discover_files() must apply settings.exclude_patterns (S-3)."""
         from unittest.mock import patch
+
         from praecepta.infra.codeintel.settings import CodeIntelSettings
 
         node_modules = tmp_path / "node_modules" / "lodash"

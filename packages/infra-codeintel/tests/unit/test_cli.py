@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: F401 – used in parametrized fixtures
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from click.testing import CliRunner
 
 from praecepta.infra.codeintel.surface.cli import cli
