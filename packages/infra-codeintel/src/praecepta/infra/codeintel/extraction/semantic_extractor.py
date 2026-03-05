@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import tiktoken
 
+from praecepta.infra.codeintel.parser.language_registry import detect_language
 from praecepta.infra.codeintel.types import SymbolRelationship, SymbolSignature, Tag
 
 if TYPE_CHECKING:
@@ -198,6 +199,7 @@ class TreeSitterSemanticExtractor:
 
         module_name = file_path.stem
         now = datetime.now(tz=UTC)
+        detected_language = detect_language(str(file_path)) or "unknown"
 
         definition_tags = [t for t in tags if t.kind == "definition"]
         symbols: list[SymbolSignature] = []
@@ -259,7 +261,7 @@ class TreeSitterSemanticExtractor:
                     qualified_name=qualified_name,
                     name=tag.name,
                     kind=kind,
-                    language="python",
+                    language=detected_language,
                     file_path=str(file_path),
                     start_line=start_line,
                     end_line=end_line,
@@ -306,8 +308,10 @@ class TreeSitterSemanticExtractor:
             else:
                 source_qualified = f"{module_name}.{source_name}"
 
-            # Determine relationship kind
-            rel_kind = "imports" if "import" in tag.rel_fname.lower() else "calls"
+            # Determine relationship kind from sub_kind (set by the .scm capture name).
+            # "import" sub_kind comes from import_statement captures; everything else
+            # is treated as a call reference.
+            rel_kind = "imports" if tag.sub_kind == "import" else "calls"
 
             key = (source_qualified, target_name, rel_kind)
             if key not in seen:
