@@ -72,18 +72,33 @@ def cli() -> None:
 @click.option("--repo", default=".", help="Repository root path")
 @click.option(
     "--transport",
-    type=click.Choice(["stdio", "sse"]),
+    type=click.Choice(["stdio", "streamable-http", "sse"]),
     default="stdio",
-    help="MCP transport",
+    help=(
+        "MCP transport protocol. "
+        "'stdio' (default) for Claude Desktop and CLI clients. "
+        "'streamable-http' for network/multi-client deployment (recommended). "
+        "'sse' for legacy SSE clients only."
+    ),
 )
-@click.option("--port", default=8420, help="Port for SSE transport")
+@click.option("--host", default="127.0.0.1", help="Bind host for network transports (default 127.0.0.1)")
+@click.option("--port", default=8420, help="Bind port for network transports (default 8420)")
 @click.option("--device", default="cpu", help="Embedding model device (cpu/cuda/mps)")
 @click.option("--config", default=None, help="Path to code-intel.json config file")
 @click.option("-v", "--verbose", is_flag=True, help="Enable debug logging")
 def serve(
-    repo: str, transport: str, port: int, device: str, config: str | None, verbose: bool
+    repo: str, transport: str, host: str, port: int, device: str, config: str | None, verbose: bool
 ) -> None:
-    """Start the MCP server."""
+    """Start the MCP server.
+
+    For Claude Desktop (stdio):
+
+        code-intel serve --repo /path/to/repo
+
+    For remote/multi-client access (streamable-http):
+
+        code-intel serve --transport streamable-http --host 0.0.0.0 --port 8420
+    """
     import os
 
     _setup_logging(verbose)
@@ -96,7 +111,10 @@ def serve(
 
     get_settings.cache_clear()
     settings = get_settings()
-    log.info("serve: repo=%s transport=%s port=%d", settings.repo_root, transport, port)
+    log.info(
+        "serve: repo=%s transport=%s host=%s port=%d",
+        settings.repo_root, transport, host, port,
+    )
 
     try:
         from praecepta.infra.codeintel.surface.mcp_tools import create_mcp_server
@@ -108,15 +126,24 @@ def serve(
         sys.exit(1)
 
     assembler = _build_assembler(repo, device)
-    server: Any = create_mcp_server(assembler)
 
-    click.echo(f"Starting code-intel MCP server (transport={transport}, repo={repo})")
+    # FastMCP(name, host=..., port=...) — host/port are constructor params, NOT run() params.
+    # run() only accepts: transport: Literal["stdio", "sse", "streamable-http"]
+    # See: mcp.server.fastmcp.FastMCP (mcp==1.26.0)
+    server: Any = create_mcp_server(assembler, host=host, port=port)
 
-    # FastMCP.run() manages its own event loop
     if transport == "stdio":
-        server.run()
+        click.echo(f"Starting code-intel MCP server (transport=stdio, repo={repo})")
     else:
-        server.run(transport="sse", host="0.0.0.0", port=port)
+        click.echo(
+            f"Starting code-intel MCP server "
+            f"(transport={transport}, host={host}, port={port}, repo={repo})"
+        )
+
+    # FastMCP.run() is synchronous and manages its own anyio event loop.
+    # run(transport="streamable-http") is recommended for new deployments.
+    # run(transport="sse") is supported for legacy clients only.
+    server.run(transport=transport)
 
 
 @cli.command()

@@ -98,9 +98,26 @@ async def code_index_refresh(
 # ---------------------------------------------------------------------------
 
 
-def create_mcp_server(assembler: Any) -> FastMCP:
-    """Create and configure the MCP server with all tools."""
-    mcp = FastMCP("code-intel")
+def create_mcp_server(
+    assembler: Any,
+    host: str = "127.0.0.1",
+    port: int = 8420,
+) -> FastMCP:
+    """Create and configure the MCP server with all tools.
+
+    Args:
+        assembler: A DefaultContextAssembler (or compatible) instance.
+        host: Bind host for network transports (default 127.0.0.1).
+              Pass "0.0.0.0" to listen on all interfaces.
+        port: Bind port for network transports (default 8420).
+              Ignored when using stdio transport.
+
+    Note on transport / host / port: ``FastMCP.run()`` accepts a *transport*
+    string (``"stdio"``, ``"streamable-http"``, or legacy ``"sse"``), but host
+    and port are **constructor** parameters — they cannot be passed to
+    ``run()`` directly.  Always use this factory to set them.
+    """
+    mcp = FastMCP("code-intel", host=host, port=port)
 
     @mcp.tool()
     async def code_context_search_tool(

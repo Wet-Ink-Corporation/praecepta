@@ -24,8 +24,11 @@ class TestCLI:
         assert result.exit_code == 0
         assert "--repo" in result.output
         assert "--transport" in result.output
+        assert "--host" in result.output
         assert "--port" in result.output
         assert "--device" in result.output
+        # Correct transport values (not just "sse")
+        assert "streamable-http" in result.output
 
     def test_index_help(self) -> None:
         runner = CliRunner()
