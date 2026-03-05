@@ -1,3 +1,18 @@
+## v2.1.0 (2026-03-05)
+
+### Feat
+
+- **infra-codeintel**: implement CLI serve, index, stats commands (B-1)
+
+### Fix
+
+- **infra-codeintel**: correct FastMCP serve API usage (mcp==1.26.0)
+- **infra-codeintel**: assembler fixes — symbol metadata, test exclusion, exclude patterns
+- **infra-codeintel**: index fixes — SQL injection, symbol record lookup, pickle guard
+- **infra-codeintel**: extractor fixes — language detection and relationship kind
+- **infra-codeintel**: parser fixes — mypy clean, repo-relative rel_path, Tag.sub_kind
+- **infra-codeintel**: foundation fixes — persistence, pagerank, lazy tiktoken, error type
+
 ## v2.0.2 (2026-03-02)
 
 ### Feat
