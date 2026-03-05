@@ -1,3 +1,9 @@
+## v2.1.1 (2026-03-05)
+
+### Feat
+
+- **infra-codeintel**: wire WatchdogFileWatcher in MCP serve via lifespan hook
+
 ## v2.1.0 (2026-03-05)
 
 ### Feat

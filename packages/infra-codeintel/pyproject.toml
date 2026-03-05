@@ -1,6 +1,6 @@
 [project]
 name = "praecepta-infra-codeintel"
-version = "2.1.0"
+version = "2.1.1"
 description = "Code intelligence and context assembly for AI agents"
 requires-python = ">=3.12"
 license = { text = "MIT" }
