@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -12,7 +13,26 @@ from praecepta.infra.codeintel.assembly.context_assembler import DefaultContextA
 from praecepta.infra.codeintel.assembly.schemas import ContextQuery, RepoSummary
 from praecepta.infra.codeintel.exceptions import CodeIntelError
 from praecepta.infra.codeintel.protocols import ContextAssembler
-from praecepta.infra.codeintel.types import QueryIntent
+from praecepta.infra.codeintel.types import QueryIntent, SymbolSignature
+
+
+def _make_sym(qualified_name: str = "mod.func_a", file_path: str = "mod.py") -> SymbolSignature:
+    """Minimal SymbolSignature for test mocks."""
+    return SymbolSignature(
+        qualified_name=qualified_name,
+        name=qualified_name.rsplit(".", 1)[-1],
+        kind="function",
+        language="python",
+        file_path=file_path,
+        start_line=1,
+        end_line=5,
+        signature=f"def {qualified_name.rsplit('.', 1)[-1]}():",
+        docstring=None,
+        parent_symbol=None,
+        embedding_text="",
+        token_count_estimate=10,
+        last_modified=datetime.now(tz=UTC),
+    )
 
 
 def _make_assembler(
@@ -22,9 +42,14 @@ def _make_assembler(
     extractor: Any = None,
     repo_root: Path | None = None,
 ) -> DefaultContextAssembler:
+    if semantic is None:
+        semantic = AsyncMock()
+        semantic.get_symbol_record.return_value = None
+        semantic.search_by_name.return_value = []
+        semantic.search.return_value = []
     return DefaultContextAssembler(
         structural_index=structural or cast("Any", MagicMock()),
-        semantic_index=semantic or cast("Any", AsyncMock()),
+        semantic_index=semantic,
         parser=parser or cast("Any", MagicMock()),
         extractor=extractor or cast("Any", MagicMock()),
         repo_root=repo_root or Path("."),
@@ -48,6 +73,7 @@ class TestDefaultContextAssembler:
         mock_semantic = AsyncMock()
         mock_semantic.search.return_value = [("mod.func_a", 0.9), ("mod.func_b", 0.7)]
         mock_semantic.search_by_name.return_value = []
+        mock_semantic.get_symbol_record.return_value = None  # fall back to stub
 
         mock_structural = MagicMock()
         mock_structural.get_ranked_symbols.return_value = [("mod.func_a", 0.8)]
@@ -69,8 +95,10 @@ class TestDefaultContextAssembler:
 
     @pytest.mark.asyncio
     async def test_direct_symbol_lookup_bypasses_search(self) -> None:
+        sym = _make_sym("auth.login")
+
         mock_semantic = AsyncMock()
-        mock_semantic.search_by_name.return_value = ["auth.login"]
+        mock_semantic.get_symbol_record.return_value = sym
         mock_semantic.search.return_value = []
 
         mock_structural = MagicMock()
@@ -84,13 +112,16 @@ class TestDefaultContextAssembler:
         result = await assembler.query(ContextQuery(symbol_names=["auth.login"], token_budget=8000))
 
         # search() should NOT be called for natural_language since it's None
+        mock_semantic.search.assert_not_called()
         assert result.chunks_available >= 0
 
     @pytest.mark.asyncio
     async def test_deduplication_across_sources(self) -> None:
+        sym = _make_sym("mod.func_a")
+
         mock_semantic = AsyncMock()
         mock_semantic.search.return_value = [("mod.func_a", 0.9)]
-        mock_semantic.search_by_name.return_value = ["mod.func_a"]
+        mock_semantic.get_symbol_record.return_value = sym
 
         mock_structural = MagicMock()
         mock_structural.get_ranked_symbols.return_value = [("mod.func_a", 0.8)]
@@ -115,8 +146,10 @@ class TestDefaultContextAssembler:
 
     @pytest.mark.asyncio
     async def test_dependency_expansion(self) -> None:
+        sym = _make_sym("mod.func_a")
+
         mock_semantic = AsyncMock()
-        mock_semantic.search_by_name.return_value = ["mod.func_a"]
+        mock_semantic.get_symbol_record.return_value = sym
         mock_semantic.search.return_value = []
 
         mock_structural = MagicMock()
@@ -143,8 +176,10 @@ class TestDefaultContextAssembler:
 
     @pytest.mark.asyncio
     async def test_no_dependency_expansion_when_disabled(self) -> None:
+        sym = _make_sym("mod.func_a")
+
         mock_semantic = AsyncMock()
-        mock_semantic.search_by_name.return_value = ["mod.func_a"]
+        mock_semantic.get_symbol_record.return_value = sym
         mock_semantic.search.return_value = []
 
         mock_structural = MagicMock()
@@ -167,9 +202,28 @@ class TestDefaultContextAssembler:
 
     @pytest.mark.asyncio
     async def test_get_symbol_returns_single_chunk(self) -> None:
+        sym = _make_sym("mod.func_a")
+
         mock_semantic = AsyncMock()
+        mock_semantic.get_symbol_record.return_value = sym
+
+        assembler = _make_assembler(semantic=mock_semantic)
+
+        chunk = await assembler.get_symbol("mod.func_a")
+        assert chunk is not None
+        assert chunk.qualified_name == "mod.func_a"
+        assert chunk.kind == "function"
+        assert chunk.language == "python"
+
+    @pytest.mark.asyncio
+    async def test_get_symbol_falls_back_to_search_by_name(self) -> None:
+        """When exact lookup misses, fall back through search_by_name."""
+        sym = _make_sym("mod.func_a")
+
+        mock_semantic = AsyncMock()
+        # First call (exact lookup) → None; second call (after search) → sym
+        mock_semantic.get_symbol_record.side_effect = [None, sym]
         mock_semantic.search_by_name.return_value = ["mod.func_a"]
-        mock_semantic.search.return_value = [("mod.func_a", 0.95)]
 
         assembler = _make_assembler(semantic=mock_semantic)
 
@@ -180,6 +234,7 @@ class TestDefaultContextAssembler:
     @pytest.mark.asyncio
     async def test_get_symbol_returns_none_for_unknown(self) -> None:
         mock_semantic = AsyncMock()
+        mock_semantic.get_symbol_record.return_value = None
         mock_semantic.search_by_name.return_value = []
 
         assembler = _make_assembler(semantic=mock_semantic)
@@ -227,6 +282,7 @@ class TestDefaultContextAssembler:
         """Cold start: semantic index empty, structural should still return results."""
         mock_semantic = AsyncMock()
         mock_semantic.search.return_value = []
+        mock_semantic.get_symbol_record.return_value = None
 
         mock_structural = MagicMock()
         mock_structural.get_ranked_symbols.return_value = [("mod.main", 0.5)]
