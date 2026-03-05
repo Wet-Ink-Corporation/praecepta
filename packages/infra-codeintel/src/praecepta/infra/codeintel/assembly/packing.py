@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import tiktoken
@@ -12,12 +13,16 @@ from praecepta.infra.codeintel.exceptions import BudgetExceededError
 if TYPE_CHECKING:
     from praecepta.infra.codeintel.assembly.schemas import CodeChunk
 
-_enc = tiktoken.encoding_for_model("gpt-4")
+
+@lru_cache(maxsize=1)
+def _get_enc() -> tiktoken.Encoding:
+    """Return a cached tiktoken encoding (lazy initialisation)."""
+    return tiktoken.encoding_for_model("gpt-4")
 
 
 def _estimate_signature_tokens(chunk: CodeChunk) -> int:
     """Estimate tokens for signature-only representation."""
-    return len(_enc.encode(chunk.signature))
+    return len(_get_enc().encode(chunk.signature))
 
 
 def pack_to_budget(

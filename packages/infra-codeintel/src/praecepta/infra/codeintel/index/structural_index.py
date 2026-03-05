@@ -54,11 +54,18 @@ class NetworkXStructuralIndex:
     list recording which symbol names created the edge.
     """
 
-    def __init__(self, cache_dir: Path | None = None) -> None:
+    def __init__(self, cache_dir: Path | None = None, damping: float | None = None) -> None:
         self._graph: nx.DiGraph = nx.DiGraph()
         self._definition_index: dict[str, str] = {}
         self._pagerank_cache: dict[str, float] | None = None
         self._cache_dir = cache_dir
+        # Resolve damping factor: explicit arg > settings value
+        if damping is not None:
+            self._damping = damping
+        else:
+            from praecepta.infra.codeintel.settings import get_settings
+
+            self._damping = get_settings().pagerank_damping
 
     # ------------------------------------------------------------------
     # Build / mutate
@@ -167,7 +174,7 @@ class NetworkXStructuralIndex:
             return []
 
         if self._pagerank_cache is None:
-            pr_kwargs: dict[str, object] = {"alpha": 0.85}
+            pr_kwargs: dict[str, object] = {"alpha": self._damping}
 
             if personalization is not None:
                 # Filter to valid nodes only
@@ -179,7 +186,7 @@ class NetworkXStructuralIndex:
         elif personalization is not None:
             # Personalization changes defeat caching — recompute
             valid = {k: v for k, v in personalization.items() if k in self._graph}
-            pr_kwargs = {"alpha": 0.85}
+            pr_kwargs = {"alpha": self._damping}
             if valid:
                 pr_kwargs["personalization"] = valid
             scores: dict[str, float] = nx.pagerank(self._graph, **pr_kwargs)

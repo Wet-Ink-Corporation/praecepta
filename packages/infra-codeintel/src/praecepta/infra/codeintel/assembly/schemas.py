@@ -96,10 +96,12 @@ class ContextQuery:
     semantic_weight: float = 0.5
 
     def validate(self) -> None:
-        """Raise ValueError if no query criteria are set."""
+        """Raise CodeIntelError if no query criteria are set."""
         if not self.natural_language and not self.symbol_names and not self.file_paths:
+            from praecepta.infra.codeintel.exceptions import CodeIntelError
+
             msg = "ContextQuery requires at least one of natural_language, symbol_names, or file_paths"
-            raise ValueError(msg)
+            raise CodeIntelError(msg, {})
 
 
 @dataclass

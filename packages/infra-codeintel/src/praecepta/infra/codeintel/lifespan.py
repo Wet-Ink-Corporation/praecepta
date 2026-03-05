@@ -35,11 +35,15 @@ async def _codeintel_lifespan(app: Any) -> AsyncIterator[None]:
     from praecepta.infra.codeintel.index.structural_index import NetworkXStructuralIndex
     from praecepta.infra.codeintel.settings import get_settings
 
+    from pathlib import Path
+
     settings = get_settings()
     logger.info("codeintel_lifespan: starting up (repo=%s)", settings.repo_root)
 
     # Startup
-    structural_index = NetworkXStructuralIndex()
+    cache_dir = Path(settings.repo_root) / settings.cache_dir
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    structural_index = NetworkXStructuralIndex(cache_dir=cache_dir)
     structural_index.load()
     logger.info("codeintel_lifespan: structural index loaded")
 

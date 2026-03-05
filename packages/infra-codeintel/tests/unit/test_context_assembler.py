@@ -10,6 +10,7 @@ import pytest
 
 from praecepta.infra.codeintel.assembly.context_assembler import DefaultContextAssembler
 from praecepta.infra.codeintel.assembly.schemas import ContextQuery, RepoSummary
+from praecepta.infra.codeintel.exceptions import CodeIntelError
 from praecepta.infra.codeintel.protocols import ContextAssembler
 from praecepta.infra.codeintel.types import QueryIntent
 
@@ -39,7 +40,7 @@ class TestDefaultContextAssembler:
     @pytest.mark.asyncio
     async def test_query_validation_rejects_empty(self) -> None:
         assembler = _make_assembler()
-        with pytest.raises(ValueError, match="at least one"):
+        with pytest.raises(CodeIntelError, match="at least one"):
             await assembler.query(ContextQuery())
 
     @pytest.mark.asyncio

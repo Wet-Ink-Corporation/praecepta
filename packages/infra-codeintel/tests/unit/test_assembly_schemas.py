@@ -10,6 +10,7 @@ from praecepta.infra.codeintel.assembly.schemas import (
     ContextResponse,
     SourceLocation,
 )
+from praecepta.infra.codeintel.exceptions import CodeIntelError
 from praecepta.infra.codeintel.types import QueryIntent
 
 
@@ -29,7 +30,7 @@ class TestContextQueryValidation:
 
     def test_invalid_empty_query(self) -> None:
         q = ContextQuery()
-        with pytest.raises(ValueError, match="at least one"):
+        with pytest.raises(CodeIntelError, match="at least one"):
             q.validate()
 
     def test_default_intent(self) -> None:
