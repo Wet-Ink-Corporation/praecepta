@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import importlib.resources
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 import tree_sitter_language_pack as tslp
+from tree_sitter import Node, Query, QueryCursor
 
 if TYPE_CHECKING:
     from pathlib import Path
-from tree_sitter import Query, QueryCursor
 
 from praecepta.infra.codeintel.exceptions import UnsupportedLanguageError
-from praecepta.infra.codeintel.parser.language_registry import SUPPORTED_LANGUAGES
+from praecepta.infra.codeintel.parser.language_registry import (
+    SUPPORTED_LANGUAGES,
+    as_language_name,
+)
 from praecepta.infra.codeintel.types import Tag
 
 
@@ -44,11 +47,16 @@ class TagExtractor:
         """Run .scm query against tree and return Tag objects."""
         query_text = self._load_query(language)
 
-        # Use Query + QueryCursor pattern (same as test_scm_queries.py)
-        ts_language = tslp.get_language(language)
+        ts_language = tslp.get_language(as_language_name(language))
         query = Query(ts_language, query_text)
         cursor = QueryCursor(query)
-        captures_dict = cursor.captures(tree.root_node)  # type: ignore[union-attr]
+
+        # tree is typed as object in the protocol; access root_node via getattr
+        root_node = getattr(tree, "root_node", None)
+        if root_node is None:
+            return []
+
+        captures_dict: dict[str, list[Node]] = cursor.captures(root_node)
 
         # Build tags from captures where name starts with "name."
         tags: list[Tag] = []
@@ -63,17 +71,24 @@ class TagExtractor:
             if len(parts) < 2:
                 continue
 
-            kind = parts[1]  # "definition" or "reference"
-            if kind not in ("definition", "reference"):
+            kind_str = parts[1]  # "definition" or "reference"
+            if kind_str not in ("definition", "reference"):
                 continue
 
+            # Narrowed literal kind for the Tag type
+            tag_kind = cast(Literal["definition", "reference"], kind_str)
+            # sub_kind is the third segment if present (e.g. "function", "call", "import")
+            sub_kind = parts[2] if len(parts) > 2 else ""
+
             for node in nodes:
-                name = (
-                    node.text.decode("utf-8")  # type: ignore[union-attr]
-                    if isinstance(node.text, bytes)  # type: ignore[union-attr]
-                    else str(node.text)  # type: ignore[union-attr]
-                )
-                line = node.start_point[0] + 1  # 0-indexed to 1-indexed
+                node_text = getattr(node, "text", b"")
+                if isinstance(node_text, bytes):
+                    name = node_text.decode("utf-8")
+                else:
+                    name = str(node_text)
+
+                start_point = getattr(node, "start_point", (0, 0))
+                line: int = start_point[0] + 1  # 0-indexed to 1-indexed
 
                 tags.append(
                     Tag(
@@ -81,7 +96,8 @@ class TagExtractor:
                         fname=str(file_path),
                         line=line,
                         name=name,
-                        kind=kind,
+                        kind=tag_kind,
+                        sub_kind=sub_kind,
                     )
                 )
 

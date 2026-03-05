@@ -17,6 +17,7 @@ class Tag(NamedTuple):
     line: int
     name: str
     kind: Literal["definition", "reference"]
+    sub_kind: str = ""  # e.g. "function", "class", "method", "call", "import"
 
 
 @dataclass(frozen=True)
