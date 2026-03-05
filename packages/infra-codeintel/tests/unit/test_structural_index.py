@@ -142,3 +142,35 @@ class TestStructuralIndex:
         r2 = idx.get_ranked_symbols(top_k=10)
         # Results should differ (one fewer node)
         assert len(r1) != len(r2)
+
+    def test_load_stale_version_is_discarded(self, tmp_path: Path) -> None:
+        """Loading a graph.pkl with wrong version must discard it silently (M-9)."""
+        import pickle
+
+        stale = {
+            "version": 0,  # old version marker
+            "graph": None,
+            "definition_index": {},
+        }
+        (tmp_path / "graph.pkl").write_bytes(pickle.dumps(stale))
+
+        idx = NetworkXStructuralIndex(cache_dir=tmp_path)
+        idx.load()  # must not raise
+        summary = idx.get_repo_summary()
+        # Stale data was discarded — index should be empty
+        assert summary.total_files == 0
+
+    def test_load_missing_version_is_discarded(self, tmp_path: Path) -> None:
+        """Loading a graph.pkl with no version key (legacy format) must discard it."""
+        import pickle
+
+        legacy = {
+            "graph": None,
+            "definition_index": {},
+        }
+        (tmp_path / "graph.pkl").write_bytes(pickle.dumps(legacy))
+
+        idx = NetworkXStructuralIndex(cache_dir=tmp_path)
+        idx.load()
+        summary = idx.get_repo_summary()
+        assert summary.total_files == 0

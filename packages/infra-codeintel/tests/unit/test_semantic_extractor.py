@@ -101,3 +101,29 @@ class TestSemanticExtractor:
         for sym in symbols:
             assert sym.start_line >= 1
             assert sym.end_line >= sym.start_line
+
+    def test_language_detected_from_file_extension(self, tmp_path: Path) -> None:
+        """Symbol language must reflect the actual file extension, not always 'python' (B-4)."""
+        py_file = tmp_path / "service.py"
+        py_file.write_text(PYTHON_SOURCE)
+
+        parser = tslp.get_parser("python")
+        tree = parser.parse(PYTHON_SOURCE.encode())
+        extractor_obj = TreeSitterSemanticExtractor()
+        # Extract with a .py file path — should get "python"
+        tags, symbols_py, _ = _parse_and_extract(PYTHON_SOURCE, filename=str(py_file))
+        assert all(s.language == "python" for s in symbols_py)
+
+    def test_relationship_import_classification(self) -> None:
+        """References with sub_kind='import' should become 'imports' edges (S-4)."""
+        from praecepta.infra.codeintel.types import Tag
+
+        extractor_obj = TreeSitterSemanticExtractor()
+        tags = [
+            Tag("mod.py", "/repo/mod.py", 1, "os", "reference", sub_kind="import"),
+            Tag("mod.py", "/repo/mod.py", 2, "login", "reference", sub_kind="call"),
+        ]
+        rels = extractor_obj.extract_relationships(Path("mod.py"), tags)
+        kinds = {r.kind for r in rels}
+        assert "imports" in kinds
+        assert "calls" in kinds

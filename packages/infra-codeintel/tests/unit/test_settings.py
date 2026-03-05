@@ -51,6 +51,15 @@ class TestCodeIntelSettings:
         assert "**/node_modules/**" in settings.exclude_patterns
         assert "**/__pycache__/**" in settings.exclude_patterns
 
+    def test_embedding_trust_remote_code_default(self) -> None:
+        """New setting should default to True for Jina model compatibility (M-7)."""
+        settings = CodeIntelSettings()
+        assert settings.embedding_trust_remote_code is True
+
+    def test_embedding_trust_remote_code_configurable(self) -> None:
+        settings = CodeIntelSettings(embedding_trust_remote_code=False)
+        assert settings.embedding_trust_remote_code is False
+
 
 @pytest.mark.unit
 class TestGetSettings:

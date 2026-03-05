@@ -297,6 +297,56 @@ class TestDefaultContextAssembler:
 
         assert len(result.chunks) >= 1
 
+    def test_discover_files_excludes_tests_by_default(self, tmp_path: Path) -> None:
+        """_discover_files() must skip test files when include_tests=False (S-2)."""
+        (tmp_path / "src").mkdir()
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "src" / "service.py").write_text("def foo(): pass\n")
+        (tmp_path / "tests" / "test_service.py").write_text("def test_foo(): pass\n")
+
+        assembler = _make_assembler(repo_root=tmp_path)
+        files = assembler._discover_files(include_tests=False)
+
+        names = [f.name for f in files]
+        assert "service.py" in names
+        assert "test_service.py" not in names
+
+    def test_discover_files_includes_tests_when_opted_in(self, tmp_path: Path) -> None:
+        """_discover_files(include_tests=True) must include test files (S-2)."""
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "test_service.py").write_text("def test_foo(): pass\n")
+
+        assembler = _make_assembler(repo_root=tmp_path)
+        files = assembler._discover_files(include_tests=True)
+
+        names = [f.name for f in files]
+        assert "test_service.py" in names
+
+    def test_discover_files_respects_exclude_patterns(self, tmp_path: Path) -> None:
+        """_discover_files() must apply settings.exclude_patterns (S-3)."""
+        from unittest.mock import patch
+        from praecepta.infra.codeintel.settings import CodeIntelSettings
+
+        node_modules = tmp_path / "node_modules" / "lodash"
+        node_modules.mkdir(parents=True)
+        (node_modules / "lodash.js").write_text("module.exports = {};")
+        (tmp_path / "src.py").write_text("def foo(): pass\n")
+
+        fake_settings = CodeIntelSettings(
+            repo_root=str(tmp_path),
+            exclude_patterns=["**/node_modules/**"],
+        )
+        assembler = _make_assembler(repo_root=tmp_path)
+        with patch(
+            "praecepta.infra.codeintel.settings.get_settings",
+            return_value=fake_settings,
+        ):
+            files = assembler._discover_files()
+
+        names = [f.name for f in files]
+        assert "src.py" in names
+        assert "lodash.js" not in names
+
     @pytest.mark.asyncio
     async def test_refresh_index(self, tmp_path: Path) -> None:
         py_file = tmp_path / "main.py"
